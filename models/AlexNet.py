@@ -172,7 +172,8 @@ def new_conv_layer(input,              # The previous layer.
 def new_fc_layer(input,
                  num_inputs,
                  num_outputs,
-                 use_relu=True):
+                 use_relu=True,
+                 use_dropout=False):
     # Create new weights and biases.
     weights = new_weights(shape=[num_inputs, num_outputs])
     biases = new_biases(length=num_outputs, value=1.0)
@@ -181,6 +182,10 @@ def new_fc_layer(input,
     # Add the ReLU activation here.
     if use_relu:
         layer = tf.nn.relu(layer)
+    
+    if use_dropout:
+        layer = tf.nn.dropout(layer, rate=0.5)
+
     return layer
 
 def flatten_layer(layer):
@@ -263,8 +268,8 @@ conv5_layer, weight5 = new_conv_layer(input=conv4_layer,
 flattened_layer, num_features = flatten_layer(conv5_layer)
 
 # FC layers
-fc6_layer = new_fc_layer(flattened_layer, num_inputs=num_features, num_outputs=fc6_size)
-fc7_layer = new_fc_layer(fc6_layer, num_inputs=fc6_size, num_outputs=fc7_size)
+fc6_layer = new_fc_layer(flattened_layer, num_inputs=num_features, num_outputs=fc6_size, use_dropout=True)
+fc7_layer = new_fc_layer(fc6_layer, num_inputs=fc6_size, num_outputs=fc7_size, use_dropout=True)
 fc8_layer = new_fc_layer(fc7_layer, num_inputs=fc7_size, num_outputs=fc8_size)
 
 print(conv1_layer)
