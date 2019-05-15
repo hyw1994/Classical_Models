@@ -272,6 +272,35 @@ fc6_layer = new_fc_layer(flattened_layer, num_inputs=num_features, num_outputs=f
 fc7_layer = new_fc_layer(fc6_layer, num_inputs=fc6_size, num_outputs=fc7_size, use_dropout=True)
 fc8_layer = new_fc_layer(fc7_layer, num_inputs=fc7_size, num_outputs=fc8_size)
 
+# optimizer
+y_train_pred = tf.nn.softmax(fc8_layer)
+y_train_pred_cls = tf.argmax(y_train_pred, axis=1)
+
+cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc8_layer, labels=y_train_true)
+cost = tf.reduce_mean(cross_entropy)
+
+optimizer = tf.train.AdamOptimizer(learning_rate=0.01).minimize(cost)
+
+# Performance Measured
+correct_prediction = tf.equal(y_train_true, y_train_pred)
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+# Tensorflow run session
+session = tf.Session()
+session.run(tf.global_variables_initializer())
+
+# Helper functions to perform optimization iterations
+batch_size = 128
+
+total_iterations = 0  #Count the total ierations
+def optimize(num_ierations):
+    global total_iterations
+    start_time = time.time()
+
+    for i in range(total_iterations, total_iterations + num_ierations):
+        # Prepare batch and train the model.
+        return    
+
 print(conv1_layer)
 print(conv2_layer)
 print(conv3_layer)
@@ -281,3 +310,4 @@ print(flattened_layer)
 print(fc6_layer)
 print(fc7_layer)
 print(fc8_layer)
+
