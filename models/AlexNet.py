@@ -1,9 +1,5 @@
 import tensorflow as tf
-import numpy as np
-import matplotlib.pyplot as plt
-import pathlib
-from sklearn.metrics import confusion_matrix
-import time
+from . import utils
 
 # This is the AlexNet model introduced by the paper "ImageNet Classification with Deep Convolutional Neural Networks".
 
@@ -23,291 +19,178 @@ import time
 # [4096] FC7: 4096 neurons
 # [1000] FC8: 1000 neurons
 
-# Step 1: Load dataset from 102 category flower dataset 
-data_root = tf.keras.utils.get_file('jpg', 'http://www.robots.ox.ac.uk/~vgg/data/flowers/102/102flowers.tgz', untar=True)
-data_root = pathlib.Path(data_root)
-print(data_root)
+class AlexNet:
+    def __init__(self):
+        super().__init__()
 
-# Step 2: Define the network
-# Input image
-image_size = 227
-image_channel = 3
-num_classes = 1000
+        # Step 1: Define the network
+        # Input image.
+        self.image_size = 227
+        self.image_channel = 3
+        self.num_classes = 1000
 
-# Convolutional Layer 1.
-conv1_params = {
-    "filter_size": 11,
-    "num_filters": 96,
-    "stride": 4,
-    "paddings": 0,
-    "use_bias": True,
-    "bias_value": 0.0,
-    "use_norm": True,
-    "use_pooling": True
-}
+        # Convolutional Layer 1.
+        self.conv1_params = {
+            "filter_size": 11,
+            "num_filters": 96,
+            "stride": 4,
+            "paddings": 0,
+            "use_bias": True,
+            "bias_value": 0.0,
+            "use_norm": True,
+            "use_pooling": True
+        }
 
-# Convolutional Layer 2.
-conv2_params = {
-    "filter_size": 5,
-    "num_filters": 256,
-    "stride": 1,
-    "paddings": 2,
-    "use_bias": True,
-    "bias_value": 1.0,
-    "use_norm": True,
-    "use_pooling": True
-}
+        # Convolutional Layer 2.
+        self.conv2_params = {
+            "filter_size": 5,
+            "num_filters": 256,
+            "stride": 1,
+            "paddings": 2,
+            "use_bias": True,
+            "bias_value": 1.0,
+            "use_norm": True,
+            "use_pooling": True
+        }
 
-# Convolutional Layer 3.
-conv3_params = {
-    "filter_size": 3,
-    "num_filters": 384,
-    "stride": 1,
-    "paddings": 1,
-    "use_bias": True,
-    "bias_value": 0.0,
-    "use_norm": False,
-    "use_pooling": False
-}
+        # Convolutional Layer 3.
+        self.conv3_params = {
+            "filter_size": 3,
+            "num_filters": 384,
+            "stride": 1,
+            "paddings": 1,
+            "use_bias": True,
+            "bias_value": 0.0,
+            "use_norm": False,
+            "use_pooling": False
+        }
 
-# Convolutional Layer 4.
-conv4_params = {
-    "filter_size": 3,
-    "num_filters": 384,
-    "stride": 1,
-    "paddings": 1,
-    "use_bias": True,
-    "bias_value": 1.0,
-    "use_norm": False,
-    "use_pooling": False
-}
+        # Convolutional Layer 4.
+        self.conv4_params = {
+            "filter_size": 3,
+            "num_filters": 384,
+            "stride": 1,
+            "paddings": 1,
+            "use_bias": True,
+            "bias_value": 1.0,
+            "use_norm": False,
+            "use_pooling": False
+        }
 
-# Convolutional Layer 5.
-conv5_params = {
-    "filter_size": 3,
-    "num_filters": 256,
-    "stride": 1,
-    "paddings": 1,
-    "use_bias": True,
-    "bias_value": 1.0,
-    "use_norm": False,
-    "use_pooling": True
-}
+        # Convolutional Layer 5.
+        self.conv5_params = {
+            "filter_size": 3,
+            "num_filters": 256,
+            "stride": 1,
+            "paddings": 1,
+            "use_bias": True,
+            "bias_value": 1.0,
+            "use_norm": False,
+            "use_pooling": True
+        }
 
-# Fully-connected layer, bias=1.0.
-fc6_size = 4096             
-fc7_size = 4096
-fc8_size = 1000
+        # Fully-connected layer, bias=1.0.
+        self.fc6_size = 4096             
+        self.fc7_size = 4096
+        self.fc8_size = 1000
 
-# Step 3: Define the helper function 
-def new_weights(shape):
-    # Create tf.Variable for filters.
-    return tf.Variable(tf.random.truncated_normal(shape, stddev=0.01))
+        # Step 4: Build network
+        # Input layer and Output classes
+        self.x_image = tf.placeholder(tf.float32, shape=[None, self.image_size, self.image_size, self.image_channel])
+        self.y_train_true = tf.placeholder(tf.float32, shape=[None, self.num_classes], name="y_train_true")
+        self.y_train_cls = tf.argmax(self.y_train_true, axis=1)
 
-def new_biases(length, value):
-    # Create tf.Variable for bias.
-    return tf.Variable(tf.constant(value, shape=[length]))
+    def build(self):
+        # CONV1 layer
+        self.conv1_layer, self.weight1 = utils.new_conv_layer(input=self.x_image,
+                                        num_input_channels=self.image_channel,
+                                        filter_size=self.conv1_params.get('filter_size'),
+                                        num_filters=self.conv1_params.get('num_filters'),
+                                        stride=self.conv1_params.get('stride'),
+                                        paddings=self.conv1_params.get('paddings'),
+                                        use_bias=self.conv1_params.get('use_bias'),
+                                        bias_value=self.conv1_params.get('bias_value'),
+                                        use_norm=self.conv1_params.get('use_norm'),
+                                        use_pooling=self.conv1_params.get('use_pooling'))
 
-def new_conv_layer(input,              # The previous layer.
-                   num_input_channels, # Num. channels in prev. layer.
-                   filter_size,        # Width and height of each filter.
-                   num_filters,        # Number of filters.
-                   stride,             # stride size of the filter.
-                   paddings=0,           # padding shape.
-                   use_bias = True,    # Use bias or not.
-                   bias_value = 0.0,   # How to initialize the bias.
-                   use_norm = False,   # Use norm or not.
-                   use_pooling=False): # Use 2x2 max-pooling.
+        # CONV2 layer
+        self.conv2_layer, self.weight2 = utils.new_conv_layer(input=self.conv1_layer,
+                                        num_input_channels=self.conv1_params.get('num_filters'),
+                                        filter_size=self.conv2_params.get('filter_size'),
+                                        num_filters=self.conv2_params.get('num_filters'),
+                                        stride=self.conv2_params.get('stride'),
+                                        paddings=self.conv2_params.get('paddings'),
+                                        use_bias=self.conv2_params.get('use_bias'),
+                                        bias_value=self.conv2_params.get('bias_value'),
+                                        use_norm=self.conv2_params.get('use_norm'),
+                                        use_pooling=self.conv2_params.get('use_pooling'))
 
-    # Shape of the filter-weights for the convolution.
-    # This format is determined by the TensorFlow API.
-    filter_shape = [filter_size, filter_size, num_input_channels, num_filters]
-    
-    # Create padding constant.
-    # Pad the layer
-    paddings = tf.constant([[0, 0],[paddings, paddings], [paddings, paddings], [0, 0]])
-    layer = tf.pad(tensor=input, 
-                   paddings=paddings, 
-                   mode='CONSTANT')
+        # CONV3 layer
+        self.conv3_layer, self.weight3 = utils.new_conv_layer(input=self.conv2_layer,
+                                        num_input_channels=self.conv2_params.get('num_filters'),
+                                        filter_size=self.conv3_params.get('filter_size'),
+                                        num_filters=self.conv3_params.get('num_filters'),
+                                        stride=self.conv3_params.get('stride'),
+                                        paddings=self.conv3_params.get('paddings'),
+                                        use_bias=self.conv3_params.get('use_bias'),
+                                        bias_value=self.conv3_params.get('bias_value'),
+                                        use_norm=self.conv3_params.get('use_norm'),
+                                        use_pooling=self.conv3_params.get('use_pooling'))
 
-    # Create new weights aka. filters with the given shape.
-    weights = new_weights(shape=filter_shape)
-        
+        # CONV4 layer
+        self.conv4_layer, self.weight4 = utils.new_conv_layer(input=self.conv3_layer,
+                                        num_input_channels=self.conv3_params.get('num_filters'),
+                                        filter_size=self.conv4_params.get('filter_size'),
+                                        num_filters=self.conv4_params.get('num_filters'),
+                                        stride=self.conv4_params.get('stride'),
+                                        paddings=self.conv4_params.get('paddings'),
+                                        use_bias=self.conv4_params.get('use_bias'),
+                                        bias_value=self.conv4_params.get('bias_value'),
+                                        use_norm=self.conv4_params.get('use_norm'),
+                                        use_pooling=self.conv4_params.get('use_pooling'))
 
-    # Do the convolotion job with different parameters settings.
-    layer = tf.nn.conv2d(input=layer,
-                         filter=weights,
-                         strides=[1, stride, stride, 1],
-                         padding='VALID')
+        # CONV5 layer
+        self.conv5_layer, self.weight5 = utils.new_conv_layer(input=self.conv4_layer,
+                                        num_input_channels=self.conv4_params.get('num_filters'),
+                                        filter_size=self.conv5_params.get('filter_size'),
+                                        num_filters=self.conv5_params.get('num_filters'),
+                                        stride=self.conv5_params.get('stride'),
+                                        paddings=self.conv5_params.get('paddings'),
+                                        use_bias=self.conv5_params.get('use_bias'),
+                                        bias_value=self.conv5_params.get('bias_value'),
+                                        use_norm=self.conv5_params.get('use_norm'),
+                                        use_pooling=self.conv5_params.get('use_pooling'))
 
-    # Add the biases to the results of the convolution.
-    # A bias-value is added to each filter-channel.
-    if(use_bias):
-        biases = new_biases(length=num_filters, value=bias_value)
-        layer += biases
+        # Flatten the last CONV layer
+        self.flattened_layer, self.num_features = utils.flatten_layer(self.conv5_layer)
 
-    # ReLU activation is use.
-    layer = tf.nn.relu(layer)
+        # FC layers
+        self.fc6_layer = utils.new_fc_layer(self.flattened_layer, num_inputs=self.num_features, num_outputs=self.fc6_size, use_dropout=True)
+        self.fc7_layer = utils.new_fc_layer(self.fc6_layer, num_inputs=self.fc6_size, num_outputs=self.fc7_size, use_dropout=True)
+        self.fc8_layer = utils.new_fc_layer(self.fc7_layer, num_inputs=self.fc7_size, num_outputs=self.fc8_size)
 
-    # Local_response_normalization is used.
-    if(use_norm):
-        layer = tf.nn.local_response_normalization(input=layer,
-                                                   depth_radius=5,
-                                                   bias=2.0,
-                                                   alpha=10**-4,
-                                                   beta=0.75)
+        # optimizer
+        self.y_train_pred = tf.nn.softmax(self.fc8_layer)
+        self.y_train_pred_cls = tf.argmax(self.y_train_pred, axis=1)
 
-    # Use pooling to down-sample the image resolution.
-    if use_pooling:
-        # This is an overlapping 3x3 max-pooling, with stride 2.
-        layer = tf.nn.max_pool(value=layer,
-                               ksize=[1, 3, 3, 1],
-                               strides=[1, 2, 2, 1],
-                               padding='VALID')
+        self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.fc8_layer, labels=self.y_train_true)
+        self.cost = tf.reduce_mean(self.cross_entropy)
 
-    # We return both the resulting layer and the filter-weights
-    # because we will plot the weights later.
-    return layer, weights
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=0.01).minimize(self.cost)
 
-def new_fc_layer(input,
-                 num_inputs,
-                 num_outputs,
-                 use_relu=True,
-                 use_dropout=False):
-    # Create new weights and biases.
-    weights = new_weights(shape=[num_inputs, num_outputs])
-    biases = new_biases(length=num_outputs, value=1.0)
-    # Do the matrix multiple and get the output neurons.
-    layer = tf.matmul(input, weights) + biases
-    # Add the ReLU activation here.
-    if use_relu:
-        layer = tf.nn.relu(layer)
-    
-    if use_dropout:
-        layer = tf.nn.dropout(layer, rate=0.5)
+        # Performance Measured
+        self.correct_prediction = tf.equal(self.y_train_true, self.y_train_pred)
+        self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
 
-    return layer
+        print(self.conv1_layer)
+        print(self.conv2_layer)
+        print(self.conv3_layer)
+        print(self.conv4_layer)
+        print(self.conv5_layer)
+        print(self.flattened_layer)
+        print(self.fc6_layer)
+        print(self.fc7_layer)
+        print(self.fc8_layer)
 
-def flatten_layer(layer):
-    # This function is used to flat the final CONV layer to connect it to FC layer.
-    layer_shape = layer.get_shape()
-    num_features = layer_shape[1:4].num_elements()
-    layer_flatten = tf.reshape(layer, [-1, num_features])
-
-    return layer_flatten, num_features
-
-    
-
-# Step 4: Build network
-# Input layer and Output classes
-x_image = tf.placeholder(tf.float32, shape=[None, image_size, image_size, image_channel])
-y_train_true = tf.placeholder(tf.float32, shape=[None, num_classes], name="y_train_true")
-y_train_cls = tf.argmax(y_train_true, axis=1)
-
-# CONV1 layer
-conv1_layer, weight1 = new_conv_layer(input=x_image,
-                                num_input_channels=image_channel,
-                                filter_size=conv1_params.get('filter_size'),
-                                num_filters=conv1_params.get('num_filters'),
-                                stride=conv1_params.get('stride'),
-                                paddings=conv1_params.get('paddings'),
-                                use_bias=conv1_params.get('use_bias'),
-                                bias_value=conv1_params.get('bias_value'),
-                                use_norm=conv1_params.get('use_norm'),
-                                use_pooling=conv1_params.get('use_pooling'))
-
-# CONV2 layer
-conv2_layer, weight2 = new_conv_layer(input=conv1_layer,
-                                num_input_channels=conv1_params.get('num_filters'),
-                                filter_size=conv2_params.get('filter_size'),
-                                num_filters=conv2_params.get('num_filters'),
-                                stride=conv2_params.get('stride'),
-                                paddings=conv2_params.get('paddings'),
-                                use_bias=conv2_params.get('use_bias'),
-                                bias_value=conv2_params.get('bias_value'),
-                                use_norm=conv2_params.get('use_norm'),
-                                use_pooling=conv2_params.get('use_pooling'))
-
-# CONV3 layer
-conv3_layer, weight3 = new_conv_layer(input=conv2_layer,
-                                num_input_channels=conv2_params.get('num_filters'),
-                                filter_size=conv3_params.get('filter_size'),
-                                num_filters=conv3_params.get('num_filters'),
-                                stride=conv3_params.get('stride'),
-                                paddings=conv3_params.get('paddings'),
-                                use_bias=conv3_params.get('use_bias'),
-                                bias_value=conv3_params.get('bias_value'),
-                                use_norm=conv3_params.get('use_norm'),
-                                use_pooling=conv3_params.get('use_pooling'))
-
-# CONV4 layer
-conv4_layer, weight4 = new_conv_layer(input=conv3_layer,
-                                num_input_channels=conv3_params.get('num_filters'),
-                                filter_size=conv4_params.get('filter_size'),
-                                num_filters=conv4_params.get('num_filters'),
-                                stride=conv4_params.get('stride'),
-                                paddings=conv4_params.get('paddings'),
-                                use_bias=conv4_params.get('use_bias'),
-                                bias_value=conv4_params.get('bias_value'),
-                                use_norm=conv4_params.get('use_norm'),
-                                use_pooling=conv4_params.get('use_pooling'))
-
-# CONV5 layer
-conv5_layer, weight5 = new_conv_layer(input=conv4_layer,
-                                num_input_channels=conv4_params.get('num_filters'),
-                                filter_size=conv5_params.get('filter_size'),
-                                num_filters=conv5_params.get('num_filters'),
-                                stride=conv5_params.get('stride'),
-                                paddings=conv5_params.get('paddings'),
-                                use_bias=conv5_params.get('use_bias'),
-                                bias_value=conv5_params.get('bias_value'),
-                                use_norm=conv5_params.get('use_norm'),
-                                use_pooling=conv5_params.get('use_pooling'))
-
-# Flatten the last CONV layer
-flattened_layer, num_features = flatten_layer(conv5_layer)
-
-# FC layers
-fc6_layer = new_fc_layer(flattened_layer, num_inputs=num_features, num_outputs=fc6_size, use_dropout=True)
-fc7_layer = new_fc_layer(fc6_layer, num_inputs=fc6_size, num_outputs=fc7_size, use_dropout=True)
-fc8_layer = new_fc_layer(fc7_layer, num_inputs=fc7_size, num_outputs=fc8_size)
-
-# optimizer
-y_train_pred = tf.nn.softmax(fc8_layer)
-y_train_pred_cls = tf.argmax(y_train_pred, axis=1)
-
-cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc8_layer, labels=y_train_true)
-cost = tf.reduce_mean(cross_entropy)
-
-optimizer = tf.train.AdamOptimizer(learning_rate=0.01).minimize(cost)
-
-# Performance Measured
-correct_prediction = tf.equal(y_train_true, y_train_pred)
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
-# Tensorflow run session
-session = tf.Session()
-session.run(tf.global_variables_initializer())
-
-# Helper functions to perform optimization iterations
-batch_size = 128
-
-total_iterations = 0  #Count the total ierations
-def optimize(num_ierations):
-    global total_iterations
-    start_time = time.time()
-
-    for i in range(total_iterations, total_iterations + num_ierations):
-        # Prepare batch and train the model.
-        return    
-
-print(conv1_layer)
-print(conv2_layer)
-print(conv3_layer)
-print(conv4_layer)
-print(conv5_layer)
-print(flattened_layer)
-print(fc6_layer)
-print(fc7_layer)
-print(fc8_layer)
-
+    def train(self):
+        return
