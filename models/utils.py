@@ -1,4 +1,7 @@
 import tensorflow as tf
+import pathlib
+import scipy.io as scio
+import random
 
 def new_weights(shape):
     # Create tf.Variable for filters.
@@ -95,3 +98,55 @@ def flatten_layer(layer):
     layer_flatten = tf.reshape(layer, [-1, num_features])
 
     return layer_flatten, num_features
+
+def download_images():
+    label_root = tf.keras.utils.get_file('imagelabels.mat', 'http://www.robots.ox.ac.uk/~vgg/data/flowers/102/imagelabels.mat')
+    image_root = tf.keras.utils.get_file('jpg', 'http://www.robots.ox.ac.uk/~vgg/data/flowers/102/102flowers.tgz', untar=True)
+    label_root = pathlib.Path(label_root)
+    image_root = pathlib.Path(image_root)
+
+    print('*' * 32)
+    print("The image set has been downloaded in the path: " + str(image_root))
+    print("The label set has been downloaded in the path: " + str(label_root))
+    print('*' * 32)
+    
+    return image_root, label_root
+
+def get_image_index(image_path):
+    image_index = image_path.split('_')[-1][:-4]
+    return image_index
+
+def preprocess_image(raw_image):
+    image = tf.image.decode_jpeg(raw_image, channels=3)
+    image_final = tf.image.resize_images(image, [227, 227])
+    image_final = image_final / 255.0
+    return image_final 
+
+def load_and_preprocess_image(path):
+    raw_image = tf.read_file(path)
+
+    return preprocess_image(raw_image)
+
+def load_labels_and_image_path(image_root, label_root):
+    labels = scio.loadmat(str(label_root)).get('labels')[0]
+
+    all_image_paths = list(image_root.glob('*.jpg'))
+    all_image_paths = [str(path) for path in all_image_paths]
+    random.shuffle(all_image_paths)
+
+    image_prefix = all_image_paths[0][:-9]
+    image_index = [get_image_index(path) for path in all_image_paths]
+    image_postfix = ".jpg"
+
+    all_image_labels = [labels[int(index) - 1] for index in image_index]
+
+    return all_image_paths, all_image_labels
+
+def load_data(image_root, label_root):
+    all_image_paths, all_image_labels = load_labels_and_image_path(image_root, label_root)
+    path_ds = tf.data.Dataset.from_tensor_slices(all_image_paths)
+    image_ds = path_ds.map(load_and_preprocess_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    label_ds = tf.data.Dataset.from_tensor_slices(tf.cast(all_image_labels, tf.int32))
+
+    image_label_ds = tf.data.Dataset.zip((image_ds, label_ds))
+    return image_label_ds

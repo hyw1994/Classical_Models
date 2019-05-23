@@ -27,7 +27,7 @@ class AlexNet:
         # Input image.
         self.image_size = 227
         self.image_channel = 3
-        self.num_classes = 1000
+        self.num_classes = 102
 
         # Convolutional Layer 1.
         self.conv1_params = {
@@ -92,7 +92,7 @@ class AlexNet:
         # Fully-connected layer, bias=1.0.
         self.fc6_size = 4096             
         self.fc7_size = 4096
-        self.fc8_size = 1000
+        self.fc8_size = self.num_classes
 
         # Step 4: Build network
         # Input layer and Output classes
@@ -193,4 +193,5 @@ class AlexNet:
         print(self.fc8_layer)
 
     def train(self):
+        
         return
