@@ -1,4 +1,5 @@
 import tensorflow as tf
+import csv
 from . import utils
 
 # This is the AlexNet model introduced by the paper "ImageNet Classification with Deep Convolutional Neural Networks".
@@ -28,6 +29,7 @@ class AlexNet:
         self.image_size = 227
         self.image_channel = 3
         self.num_classes = 102
+        self.accs = []
 
         # Convolutional Layer 1.
         self.conv1_params = {
@@ -96,13 +98,13 @@ class AlexNet:
 
         # Step 4: Build network
         # Input layer and Output classes
-        self.x_image = tf.placeholder(tf.float32, shape=[None, self.image_size, self.image_size, self.image_channel])
-        self.y_train_true = tf.placeholder(tf.float32, shape=[None, self.num_classes], name="y_train_true")
-        self.y_train_cls = tf.argmax(self.y_train_true, axis=1)
+        # self.x_image = tf.placeholder(tf.float32, shape=[None, self.image_size, self.image_size, self.image_channel])
+        # self.y_train_true = tf.placeholder(tf.float32, shape=[None, self.num_classes], name="y_train_true")
+        # self.y_train_cls = tf.argmax(self.y_train_true, axis=1)
 
-    def build(self):
+    def build(self, image_batch, label_batch):
         # CONV1 layer
-        self.conv1_layer, self.weight1 = utils.new_conv_layer(input=self.x_image,
+        self.conv1_layer, self.weight1 = utils.new_conv_layer(input=image_batch,
                                         num_input_channels=self.image_channel,
                                         filter_size=self.conv1_params.get('filter_size'),
                                         num_filters=self.conv1_params.get('num_filters'),
@@ -172,14 +174,15 @@ class AlexNet:
         # optimizer
         self.y_train_pred = tf.nn.softmax(self.fc8_layer)
         self.y_train_pred_cls = tf.argmax(self.y_train_pred, axis=1)
+        self.y_train_cls = tf.argmax(label_batch, axis=1)
 
-        self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.fc8_layer, labels=self.y_train_true)
+        self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.fc8_layer, labels=label_batch)
         self.cost = tf.reduce_mean(self.cross_entropy)
 
         self.optimizer = tf.train.AdamOptimizer(learning_rate=0.01).minimize(self.cost)
 
         # Performance Measured
-        self.correct_prediction = tf.equal(self.y_train_true, self.y_train_pred)
+        self.correct_prediction = tf.equal(label_batch, self.y_train_pred)
         self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
 
         print(self.conv1_layer)
@@ -192,6 +195,17 @@ class AlexNet:
         print(self.fc7_layer)
         print(self.fc8_layer)
 
-    def train(self):
-        
-        return
+    def train(self, sess, EPOCH):
+        sess.run(tf.global_variables_initializer())
+        for epoch in range(EPOCH):
+            for _ in range(64):
+                _, acc = sess.run([self.optimizer, self.accuracy])
+                print(acc)
+                self.accs.append(acc)
+        with open('accs.csv', 'a') as csvFile:
+            writer = csv.writer(csvFile)
+            writer.writerow(self.accs)
+        csvFile.close()
+
+        # print(sess.run(self.y_train_pred_cls))
+        # print(sess.run(self.y_train_cls))

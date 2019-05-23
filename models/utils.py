@@ -122,10 +122,10 @@ def preprocess_image(raw_image):
     image_final = image_final / 255.0
     return image_final 
 
-def load_and_preprocess_image(path):
+def load_and_preprocess_image(path, labels):
     raw_image = tf.read_file(path)
 
-    return preprocess_image(raw_image)
+    return preprocess_image(raw_image), labels
 
 def load_labels_and_image_path(image_root, label_root):
     labels = scio.loadmat(str(label_root)).get('labels')[0]
@@ -142,11 +142,24 @@ def load_labels_and_image_path(image_root, label_root):
 
     return all_image_paths, all_image_labels
 
+def split_train_cv_test_set(images, labels):
+    train_pair = (images[0: 6142], labels[0: 6142, :])
+    cv_pair = (images[6142: 7143], labels[6142: 7143, :])
+    test_pair = (images[6142: 7143], labels[6142: 7143, :])
+    return train_pair, cv_pair, train_pair
+
 def load_data(image_root, label_root):
     all_image_paths, all_image_labels = load_labels_and_image_path(image_root, label_root)
-    path_ds = tf.data.Dataset.from_tensor_slices(all_image_paths)
-    image_ds = path_ds.map(load_and_preprocess_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    label_ds = tf.data.Dataset.from_tensor_slices(tf.cast(all_image_labels, tf.int32))
+    all_image_labels = tf.one_hot(all_image_labels, depth=102, axis=-1)
 
-    image_label_ds = tf.data.Dataset.zip((image_ds, label_ds))
-    return image_label_ds
+    train_pair, cv_pair, test_pair = split_train_cv_test_set(all_image_paths, all_image_labels)
+
+    train_path_ds = tf.data.Dataset.from_tensor_slices(train_pair)
+    cv_path_ds = tf.data.Dataset.from_tensor_slices(cv_pair)
+    test_path_ds = tf.data.Dataset.from_tensor_slices(test_pair)
+
+    train_ds = train_path_ds.map(load_and_preprocess_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    cv_ds = cv_path_ds.map(load_and_preprocess_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    test_ds = test_path_ds.map(load_and_preprocess_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    return train_ds, cv_ds, test_ds
