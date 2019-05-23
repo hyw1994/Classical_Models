@@ -18,8 +18,11 @@ with tf.Session() as sess:
     ds = ds.batch(BATCH_SIZE)
     ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
-    iterator = ds.make_one_shot_iterator()
+    iterator = tf.data.Iterator.from_structure(ds.output_types, ds.output_shapes)
+    ds_initializer = iterator.make_initializer(ds)
+    
     image_batch, label_batch = iterator.get_next()
+    sess.run(ds_initializer)
     # plt.imshow(sess.run(image_batch)[0])
     alexnet = AlexNet()
     alexnet.build(image_batch, label_batch)
