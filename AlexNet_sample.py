@@ -18,14 +18,14 @@ with tf.Session() as sess:
     image_root, label_root = utils.download_images()
     train_ds, cv_ds, test_ds = utils.load_data(image_root, label_root)
     
-    ds = train_ds.shuffle(buffer_size=8190)
-    ds = ds.repeat()
-    ds = ds.batch(BATCH_SIZE)
-    # ds = ds.apply(tf.data.experimental.copy_to_device('/gpu:0')) 
-    ds = ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    train_ds = train_ds.shuffle(buffer_size=8190)
+    train_ds = train_ds.repeat()
+    train_ds = train_ds.batch(BATCH_SIZE)
+    # train_ds = train_ds.apply(tf.data.experimental.copy_to_device('/gpu:0')) 
+    train_ds = train_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
-    iterator = tf.data.Iterator.from_structure(ds.output_types, ds.output_shapes)
-    ds_initializer = iterator.make_initializer(ds)
+    iterator = tf.data.Iterator.from_structure(train_ds.output_types, train_ds.output_shapes)
+    ds_initializer = iterator.make_initializer(train_ds)
     
     image_batch, label_batch = iterator.get_next()
     sess.run(ds_initializer)
@@ -36,4 +36,4 @@ with tf.Session() as sess:
 
     alexnet.build(image_batch, label_batch)
     alexnet.save_graph(sess)
-    # alexnet.train(sess, EPOCH)
+    alexnet.train(sess, EPOCH)

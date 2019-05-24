@@ -71,6 +71,11 @@ def new_conv_layer(input,              # The previous layer.
                                 strides=[1, 2, 2, 1],
                                 padding='VALID', name=name+'-pooling')
 
+        # summary
+        tf.summary.histogram(name+'weights', weights)
+        tf.summary.histogram(name+'biases', biases)
+        tf.summary.histogram(name+'activations', layer)
+
         # We return both the resulting layer and the filter-weights
         # because we will plot the weights later.
         return layer, weights
@@ -92,6 +97,11 @@ def new_fc_layer(input,
         
         if use_dropout:
             layer = tf.nn.dropout(layer, rate=0.5, name=name+'-dropout')
+
+        # summary
+        tf.summary.histogram(name+'weights', weights)
+        tf.summary.histogram(name+'biases', biases)
+        tf.summary.histogram(name+'activations', layer)
 
         return layer
 

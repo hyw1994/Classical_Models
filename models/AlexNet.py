@@ -29,7 +29,6 @@ class AlexNet:
         self.image_size = 227
         self.image_channel = 3
         self.num_classes = 102
-        self.accs = []
 
         # Convolutional Layer 1.
         self.conv1_params = {
@@ -95,16 +94,19 @@ class AlexNet:
         self.fc6_size = 4096             
         self.fc7_size = 4096
         self.fc8_size = self.num_classes
+        self.writer = tf.summary.FileWriter('models/computational_graph/AlexNet')
 
         # Step 4: Build network
         # Input layer and Output classes
-        # self.x_image = tf.placeholder(tf.float32, shape=[None, self.image_size, self.image_size, self.image_channel])
+        # self.x_image = tf.placeholder(tf.float32, shape=[None, self.image_size, self.image_size, self.image_channel], name="x_train_image")
         # self.y_train_true = tf.placeholder(tf.float32, shape=[None, self.num_classes], name="y_train_true")
         # self.y_train_cls = tf.argmax(self.y_train_true, axis=1)
 
     def build(self, image_batch, label_batch):
+        self.x_image = image_batch
+        self.y_train_true = label_batch
         # CONV1 layer
-        self.conv1_layer, self.weight1 = utils.new_conv_layer(input=image_batch,
+        self.conv1_layer, self.weight1 = utils.new_conv_layer(input=self.x_image,
                                         num_input_channels=self.image_channel,
                                         filter_size=self.conv1_params.get('filter_size'),
                                         num_filters=self.conv1_params.get('num_filters'),
@@ -180,10 +182,13 @@ class AlexNet:
             # loss function
             self.y_train_pred = tf.nn.softmax(self.fc8_layer)
             self.y_train_pred_cls = tf.argmax(self.y_train_pred, axis=1)
-            self.y_train_cls = tf.argmax(label_batch, axis=1)
+            self.y_train_cls = tf.argmax(self.y_train_true, axis=1)
 
-            self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.fc8_layer, labels=label_batch)
+            self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.fc8_layer, labels=self.y_train_true)
             self.cost = tf.reduce_mean(self.cross_entropy)
+            
+            tf.summary.scalar('cross_entropy_loss', self.cost)
+
         
         with tf.name_scope('optimizer'):
             # optimizer
@@ -191,8 +196,9 @@ class AlexNet:
 
         with tf.name_scope('accuracy'):
             # Performance Measured
-            self.correct_prediction = tf.equal(label_batch, self.y_train_pred)
+            self.correct_prediction = tf.equal(self.y_train_true, self.y_train_pred)
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
+            tf.summary.scalar('accuracy', self.accuracy)
 
         print(self.conv1_layer)
         print(self.conv2_layer)
@@ -206,19 +212,17 @@ class AlexNet:
 
     def train(self, sess, EPOCH):
         sess.run(tf.global_variables_initializer())
+        merged_summary = tf.summary.merge_all()
         for epoch in range(EPOCH):
-            for _ in range(64):
+            for iter in range(64):
+                if iter % 5 == 0:
+                    s = sess.run(merged_summary)
+                    self.writer.add_summary(s, iter)
                 _, acc = sess.run([self.optimizer, self.accuracy])
                 print(acc)
-                self.accs.append(acc)
-        with open('accs.csv', 'a') as csvFile:
-            writer = csv.writer(csvFile)
-            writer.writerow(self.accs)
-        csvFile.close()
 
         # print(sess.run(self.y_train_pred_cls))
         # print(sess.run(self.y_train_cls))
     
     def save_graph(self, sess):
-        writer = tf.summary.FileWriter('models/computational_graph/AlexNet')
-        writer.add_graph(sess.graph)
+        self.writer.add_graph(sess.graph)
