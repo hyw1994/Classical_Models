@@ -11,7 +11,8 @@ from models import utils
 # print('Found GPU at: {}'.format(device_name))
 
 # Step 1: Load dataset from 102 category flower dataset 
-with tf.Session() as sess:
+with tf.Session(config=tf.ConfigProto(
+      allow_soft_placement=True, log_device_placement=False)) as sess:
     BATCH_SIZE = 128
     EPOCH = 4
 
