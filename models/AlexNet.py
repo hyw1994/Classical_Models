@@ -113,7 +113,8 @@ class AlexNet:
                                         use_bias=self.conv1_params.get('use_bias'),
                                         bias_value=self.conv1_params.get('bias_value'),
                                         use_norm=self.conv1_params.get('use_norm'),
-                                        use_pooling=self.conv1_params.get('use_pooling'))
+                                        use_pooling=self.conv1_params.get('use_pooling'), 
+                                        name='conv1')
 
         # CONV2 layer
         self.conv2_layer, self.weight2 = utils.new_conv_layer(input=self.conv1_layer,
@@ -125,7 +126,8 @@ class AlexNet:
                                         use_bias=self.conv2_params.get('use_bias'),
                                         bias_value=self.conv2_params.get('bias_value'),
                                         use_norm=self.conv2_params.get('use_norm'),
-                                        use_pooling=self.conv2_params.get('use_pooling'))
+                                        use_pooling=self.conv2_params.get('use_pooling'),
+                                        name='conv2')
 
         # CONV3 layer
         self.conv3_layer, self.weight3 = utils.new_conv_layer(input=self.conv2_layer,
@@ -137,7 +139,8 @@ class AlexNet:
                                         use_bias=self.conv3_params.get('use_bias'),
                                         bias_value=self.conv3_params.get('bias_value'),
                                         use_norm=self.conv3_params.get('use_norm'),
-                                        use_pooling=self.conv3_params.get('use_pooling'))
+                                        use_pooling=self.conv3_params.get('use_pooling'),
+                                        name='conv3')
 
         # CONV4 layer
         self.conv4_layer, self.weight4 = utils.new_conv_layer(input=self.conv3_layer,
@@ -149,7 +152,8 @@ class AlexNet:
                                         use_bias=self.conv4_params.get('use_bias'),
                                         bias_value=self.conv4_params.get('bias_value'),
                                         use_norm=self.conv4_params.get('use_norm'),
-                                        use_pooling=self.conv4_params.get('use_pooling'))
+                                        use_pooling=self.conv4_params.get('use_pooling'),
+                                        name='conv4')
 
         # CONV5 layer
         self.conv5_layer, self.weight5 = utils.new_conv_layer(input=self.conv4_layer,
@@ -161,29 +165,34 @@ class AlexNet:
                                         use_bias=self.conv5_params.get('use_bias'),
                                         bias_value=self.conv5_params.get('bias_value'),
                                         use_norm=self.conv5_params.get('use_norm'),
-                                        use_pooling=self.conv5_params.get('use_pooling'))
+                                        use_pooling=self.conv5_params.get('use_pooling'),
+                                        name='conv5')
 
         # Flatten the last CONV layer
-        self.flattened_layer, self.num_features = utils.flatten_layer(self.conv5_layer)
+        self.flattened_layer, self.num_features = utils.flatten_layer(self.conv5_layer, name='flatten')
 
         # FC layers
-        self.fc6_layer = utils.new_fc_layer(self.flattened_layer, num_inputs=self.num_features, num_outputs=self.fc6_size, use_dropout=True)
-        self.fc7_layer = utils.new_fc_layer(self.fc6_layer, num_inputs=self.fc6_size, num_outputs=self.fc7_size, use_dropout=True)
-        self.fc8_layer = utils.new_fc_layer(self.fc7_layer, num_inputs=self.fc7_size, num_outputs=self.fc8_size)
+        self.fc6_layer = utils.new_fc_layer(self.flattened_layer, num_inputs=self.num_features, num_outputs=self.fc6_size, use_dropout=True, name='fc6')
+        self.fc7_layer = utils.new_fc_layer(self.fc6_layer, num_inputs=self.fc6_size, num_outputs=self.fc7_size, use_dropout=True, name='fc7')
+        self.fc8_layer = utils.new_fc_layer(self.fc7_layer, num_inputs=self.fc7_size, num_outputs=self.fc8_size, name='fc8')
+        
+        with tf.name_scope('loss'):
+            # loss function
+            self.y_train_pred = tf.nn.softmax(self.fc8_layer)
+            self.y_train_pred_cls = tf.argmax(self.y_train_pred, axis=1)
+            self.y_train_cls = tf.argmax(label_batch, axis=1)
 
-        # optimizer
-        self.y_train_pred = tf.nn.softmax(self.fc8_layer)
-        self.y_train_pred_cls = tf.argmax(self.y_train_pred, axis=1)
-        self.y_train_cls = tf.argmax(label_batch, axis=1)
+            self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.fc8_layer, labels=label_batch)
+            self.cost = tf.reduce_mean(self.cross_entropy)
+        
+        with tf.name_scope('optimizer'):
+            # optimizer
+            self.optimizer = tf.train.AdamOptimizer(learning_rate=0.01).minimize(self.cost)
 
-        self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.fc8_layer, labels=label_batch)
-        self.cost = tf.reduce_mean(self.cross_entropy)
-
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=0.01).minimize(self.cost)
-
-        # Performance Measured
-        self.correct_prediction = tf.equal(label_batch, self.y_train_pred)
-        self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
+        with tf.name_scope('accuracy'):
+            # Performance Measured
+            self.correct_prediction = tf.equal(label_batch, self.y_train_pred)
+            self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
 
         print(self.conv1_layer)
         print(self.conv2_layer)
@@ -209,3 +218,7 @@ class AlexNet:
 
         # print(sess.run(self.y_train_pred_cls))
         # print(sess.run(self.y_train_cls))
+    
+    def save_graph(self, sess):
+        writer = tf.summary.FileWriter('models/computational_graph/AlexNet')
+        writer.add_graph(sess.graph)

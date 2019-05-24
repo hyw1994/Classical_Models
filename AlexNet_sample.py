@@ -5,10 +5,10 @@ import random
 from models.AlexNet import AlexNet
 from models import utils
 
-device_name = tf.test.gpu_device_name()
-if device_name != '/device:GPU:0':
-  raise SystemError('GPU device not found')
-print('Found GPU at: {}'.format(device_name))
+# device_name = tf.test.gpu_device_name()
+# if device_name != '/device:GPU:0':
+#   raise SystemError('GPU device not found')
+# print('Found GPU at: {}'.format(device_name))
 
 # Step 1: Load dataset from 102 category flower dataset 
 with tf.Session() as sess:
@@ -35,4 +35,5 @@ with tf.Session() as sess:
     #     alexnet.build(image_batch, label_batch)
 
     alexnet.build(image_batch, label_batch)
-    alexnet.train(sess, EPOCH)
+    alexnet.save_graph(sess)
+    # alexnet.train(sess, EPOCH)

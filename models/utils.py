@@ -3,13 +3,13 @@ import pathlib
 import scipy.io as scio
 import random
 
-def new_weights(shape):
+def new_weights(shape, name):
     # Create tf.Variable for filters.
-    return tf.Variable(tf.random.truncated_normal(shape, stddev=0.01))
+    return tf.Variable(tf.random.truncated_normal(shape, stddev=0.01), name=name+'-W')
 
-def new_biases(length, value):
+def new_biases(length, value, name):
     # Create tf.Variable for bias.
-    return tf.Variable(tf.constant(value, shape=[length]))
+    return tf.Variable(tf.constant(value, shape=[length]), name=name+'-b')
 
 def new_conv_layer(input,              # The previous layer.
                    num_input_channels, # Num. channels in prev. layer.
@@ -20,84 +20,89 @@ def new_conv_layer(input,              # The previous layer.
                    use_bias = True,    # Use bias or not.
                    bias_value = 0.0,   # How to initialize the bias.
                    use_norm = False,   # Use norm or not.
-                   use_pooling=False): # Use 2x2 max-pooling.
+                   use_pooling=False,  # Use 2x2 max-pooling.
+                   name='conv'): 
 
     # Shape of the filter-weights for the convolution.
     # This format is determined by the TensorFlow API.
-    filter_shape = [filter_size, filter_size, num_input_channels, num_filters]
-    
-    # Create padding constant.
-    # Pad the layer
-    paddings = tf.constant([[0, 0],[paddings, paddings], [paddings, paddings], [0, 0]])
-    layer = tf.pad(tensor=input, 
-                   paddings=paddings, 
-                   mode='CONSTANT')
-
-    # Create new weights aka. filters with the given shape.
-    weights = new_weights(shape=filter_shape)
+    with tf.name_scope(name):
+        filter_shape = [filter_size, filter_size, num_input_channels, num_filters]
         
+        # Create padding constant.
+        # Pad the layer
+        layer = input
+        if(paddings > 0):
+            paddings = tf.constant([[0, 0],[paddings, paddings], [paddings, paddings], [0, 0]])
+            layer = tf.pad(tensor=layer, 
+                            paddings=paddings, 
+                            mode='CONSTANT', name=name + '-padding')
 
-    # Do the convolotion job with different parameters settings.
-    layer = tf.nn.conv2d(input=layer,
-                         filter=weights,
-                         strides=[1, stride, stride, 1],
-                         padding='VALID')
+        # Create new weights aka. filters with the given shape.
+        weights = new_weights(shape=filter_shape, name=name)
+            
+        # Do the convolotion job with different parameters settings.
+        layer = tf.nn.conv2d(input=layer,
+                            filter=weights,
+                            strides=[1, stride, stride, 1],
+                            padding='VALID', name=name + '-conv')
 
-    # Add the biases to the results of the convolution.
-    # A bias-value is added to each filter-channel.
-    if(use_bias):
-        biases = new_biases(length=num_filters, value=bias_value)
-        layer = tf.add(layer, biases)
+        # Add the biases to the results of the convolution.
+        # A bias-value is added to each filter-channel.
+        if(use_bias):
+            biases = new_biases(length=num_filters, value=bias_value, name=name)
+            layer = tf.add(layer, biases)
 
-    # ReLU activation is use.
-    layer = tf.nn.relu(layer)
+        # ReLU activation is use.
+        layer = tf.nn.relu(layer, name=name + '-relu')
 
-    # Local_response_normalization is used.
-    if(use_norm):
-        layer = tf.nn.local_response_normalization(input=layer,
-                                                   depth_radius=5,
-                                                   bias=2.0,
-                                                   alpha=10**-4,
-                                                   beta=0.75)
+        # Local_response_normalization is used.
+        if(use_norm):
+            layer = tf.nn.local_response_normalization(input=layer,
+                                                    depth_radius=5,
+                                                    bias=2.0,
+                                                    alpha=10**-4,
+                                                    beta=0.75, name=name + '-lr-norm')
 
-    # Use pooling to down-sample the image resolution.
-    if use_pooling:
-        # This is an overlapping 3x3 max-pooling, with stride 2.
-        layer = tf.nn.max_pool(value=layer,
-                               ksize=[1, 3, 3, 1],
-                               strides=[1, 2, 2, 1],
-                               padding='VALID')
+        # Use pooling to down-sample the image resolution.
+        if use_pooling:
+            # This is an overlapping 3x3 max-pooling, with stride 2.
+            layer = tf.nn.max_pool(value=layer,
+                                ksize=[1, 3, 3, 1],
+                                strides=[1, 2, 2, 1],
+                                padding='VALID', name=name+'-pooling')
 
-    # We return both the resulting layer and the filter-weights
-    # because we will plot the weights later.
-    return layer, weights
+        # We return both the resulting layer and the filter-weights
+        # because we will plot the weights later.
+        return layer, weights
 
 def new_fc_layer(input,
                  num_inputs,
                  num_outputs,
                  use_relu=True,
-                 use_dropout=False):
-    # Create new weights and biases.
-    weights = new_weights(shape=[num_inputs, num_outputs])
-    biases = new_biases(length=num_outputs, value=1.0)
-    # Do the matrix multiple and get the output neurons.
-    layer = tf.add(tf.matmul(input, weights), biases)
-    # Add the ReLU activation here.
-    if use_relu:
-        layer = tf.nn.relu(layer)
-    
-    if use_dropout:
-        layer = tf.nn.dropout(layer, rate=0.5)
+                 use_dropout=False, name='fc'):
+    with tf.name_scope(name):
+        # Create new weights and biases.
+        weights = new_weights(shape=[num_inputs, num_outputs], name=name)
+        biases = new_biases(length=num_outputs, value=1.0, name=name)
+        # Do the matrix multiple and get the output neurons.
+        layer = tf.add(tf.matmul(input, weights), biases, name=name + '-add')
+        # Add the ReLU activation here.
+        if use_relu:
+            layer = tf.nn.relu(layer, name=name+'-relu')
+        
+        if use_dropout:
+            layer = tf.nn.dropout(layer, rate=0.5, name=name+'-dropout')
 
-    return layer
+        return layer
 
-def flatten_layer(layer):
-    # This function is used to flat the final CONV layer to connect it to FC layer.
-    layer_shape = layer.get_shape()
-    num_features = layer_shape[1:4].num_elements()
-    layer_flatten = tf.reshape(layer, [-1, num_features])
+def flatten_layer(layer, name):
+    with tf.name_scope(name):
+        # This function is used to flat the final CONV layer to connect it to FC layer.
+        layer_shape = layer.get_shape()
+        num_features = layer_shape[1:4].num_elements()
+        layer_flatten = tf.reshape(layer, [-1, num_features], name=name + '-flatten')
 
-    return layer_flatten, num_features
+        return layer_flatten, num_features
 
 def download_images():
     label_root = tf.keras.utils.get_file('imagelabels.mat', 'http://www.robots.ox.ac.uk/~vgg/data/flowers/102/imagelabels.mat')
