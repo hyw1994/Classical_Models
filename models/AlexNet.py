@@ -18,7 +18,7 @@ from . import utils
 # [6*6*256] MAX POOLING3 LAYER: 3*3, stride 2.
 # [4096] FC6: 4096 neurons
 # [4096] FC7: 4096 neurons
-# [1000] FC8: 1000 neurons
+# [1000] FC8: 1000 neurons, change it to the categories size while using.
 
 class AlexNet:
     def __init__(self):
@@ -192,14 +192,16 @@ class AlexNet:
         
         with tf.name_scope('optimizer'):
             # optimizer
-            self.optimizer = tf.train.AdamOptimizer(learning_rate=0.01).minimize(self.cost)
+            self.optimizer = tf.train.AdamOptimizer(learning_rate=0.001).minimize(self.cost)
 
         with tf.name_scope('accuracy'):
             # Performance Measured
             self.correct_prediction = tf.equal(self.y_train_true, self.y_train_pred)
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
             tf.summary.scalar('accuracy', self.accuracy)
-
+        print('-' * 32)
+        print("The model has been built successfully!")
+        print("The model structure is:")
         print(self.conv1_layer)
         print(self.conv2_layer)
         print(self.conv3_layer)
@@ -209,7 +211,7 @@ class AlexNet:
         print(self.fc6_layer)
         print(self.fc7_layer)
         print(self.fc8_layer)
-
+        print('-' * 32)
     def train(self, sess, EPOCH):
         sess.run(tf.global_variables_initializer())
         merged_summary = tf.summary.merge_all()
@@ -220,9 +222,6 @@ class AlexNet:
                     self.writer.add_summary(s, iter)
                 _, acc = sess.run([self.optimizer, self.accuracy])
                 print(acc)
-
-        # print(sess.run(self.y_train_pred_cls))
-        # print(sess.run(self.y_train_cls))
     
     def save_graph(self, sess):
         self.writer.add_graph(sess.graph)

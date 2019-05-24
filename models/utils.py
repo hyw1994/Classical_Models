@@ -178,3 +178,17 @@ def load_data(image_root, label_root):
     test_ds = test_path_ds.map(load_and_preprocess_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     return train_ds, cv_ds, test_ds
+
+def prepare_train_ds(train_ds, BATCH_SIZE, INPUT_SIZE):
+    # We shuffle and batch the training samples to make the training process work better.
+    # We prepare the shuffle buffer to be the same size as the whole size of the input sample to make it shuffle globally.
+    train_ds = train_ds.shuffle(buffer_size=INPUT_SIZE)
+    train_ds = train_ds.repeat()
+    train_ds = train_ds.batch(BATCH_SIZE)
+    if(tf.test.is_gpu_available):
+        # If we can use gpu, we copy the data to gpu in advance.
+        train_ds = train_ds.apply(tf.data.experimental.copy_to_device('/gpu:0')) 
+    train_ds = train_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    # We prefetch the data to accerlate the training process.
+
+    return train_ds

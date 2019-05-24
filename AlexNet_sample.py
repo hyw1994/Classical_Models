@@ -13,17 +13,13 @@ from models import utils
 # Step 1: Load dataset from 102 category flower dataset 
 with tf.Session(config=tf.ConfigProto(
       allow_soft_placement=True, log_device_placement=False)) as sess:
-    BATCH_SIZE = 128
-    EPOCH = 4
+    BATCH_SIZE = 5000
+    EPOCH = 2
+    INPUT_SIZE=8190
 
     image_root, label_root = utils.download_images()
     train_ds, cv_ds, test_ds = utils.load_data(image_root, label_root)
-    
-    train_ds = train_ds.shuffle(buffer_size=8190)
-    train_ds = train_ds.repeat()
-    train_ds = train_ds.batch(BATCH_SIZE)
-    # train_ds = train_ds.apply(tf.data.experimental.copy_to_device('/gpu:0')) 
-    train_ds = train_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    train_ds = utils.prepare_train_ds(train_ds, BATCH_SIZE, INPUT_SIZE)
 
     iterator = tf.data.Iterator.from_structure(train_ds.output_types, train_ds.output_shapes)
     ds_initializer = iterator.make_initializer(train_ds)
