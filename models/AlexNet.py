@@ -21,14 +21,14 @@ from . import utils
 # [1000] FC8: 1000 neurons, change it to the categories size while using.
 
 class AlexNet:
-    def __init__(self):
+    def __init__(self, num_classes):
         super().__init__()
 
         # Step 1: Define the network
         # Input image.
         self.image_size = 227
         self.image_channel = 3
-        self.num_classes = 102
+        self.num_classes = num_classes
 
         # Convolutional Layer 1.
         self.conv1_params = {
@@ -104,7 +104,7 @@ class AlexNet:
 
     def build(self, image_batch, label_batch):
         self.x_image = image_batch
-        self.y_train_true = label_batch
+        self.y_train_true = tf.one_hot(label_batch, depth=self.num_classes, axis=1)
         # CONV1 layer
         self.conv1_layer, self.weight1 = utils.new_conv_layer(input=self.x_image,
                                         num_input_channels=self.image_channel,

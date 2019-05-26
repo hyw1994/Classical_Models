@@ -179,16 +179,30 @@ def load_data(image_root, label_root):
 
     return train_ds, cv_ds, test_ds
 
+def pre_process_ds_images(image, label):
+    """ reshape the image to [227, 227] and one-hot the labels to fit the network."""
+    image = tf.cast(image, tf.float32)
+    image = tf.image.resize_images(images=image, size=[227, 227])
+    image = image/255.0
+    return image, label
+
 def prepare_train_ds(train_ds, BATCH_SIZE, INPUT_SIZE):
-    # We shuffle and batch the training samples to make the training process work better.
+    """We shuffle and batch the training samples to make the training process work better."""
+    # Resize the input image size.
+    train_ds = train_ds.map(pre_process_ds_images) 
+
     # We prepare the shuffle buffer to be the same size as the whole size of the input sample to make it shuffle globally.
     train_ds = train_ds.shuffle(buffer_size=INPUT_SIZE)
     train_ds = train_ds.repeat()
     train_ds = train_ds.batch(BATCH_SIZE)
     if(tf.test.is_gpu_available):
-        # If we can use gpu, we copy the data to gpu in advance.
-        train_ds = train_ds.apply(tf.data.experimental.copy_to_device('/gpu:0')) 
+        # If gpu can be used , we copy the data to gpu in advance.
+        train_ds = train_ds.apply(tf.data.experimental.copy_to_device('/gpu:0'))
+    # Prefetch the data to accerlate the training process. 
     train_ds = train_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-    # We prefetch the data to accerlate the training process.
 
-    return train_ds
+    # Build iterator to iterate through batches.
+    iterator = tf.data.Iterator.from_structure(train_ds.output_types, train_ds.output_shapes)
+    ds_initializer = iterator.make_initializer(train_ds)
+
+    return train_ds, iterator, ds_initializer
