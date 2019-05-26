@@ -212,16 +212,19 @@ class AlexNet:
         print(self.fc7_layer)
         print(self.fc8_layer)
         print('-' * 32)
-    def train(self, sess, EPOCH):
+
+    def train(self, sess, EPOCH, iter_number):
         sess.run(tf.global_variables_initializer())
         merged_summary = tf.summary.merge_all()
         for epoch in range(EPOCH):
-            for iter in range(64):
-                if iter % 5 == 0:
+            print("-"*32)
+            for step in range(iter_number):
+                if step % 5 == 0:
                     s = sess.run(merged_summary)
-                    self.writer.add_summary(s, iter)
+                    self.writer.add_summary(s, step)
                 _, acc = sess.run([self.optimizer, self.accuracy])
-                print(acc)
+                print("EPOCH: {}, step: {} accuracy: {}".format(epoch+1, step, acc))
+            print("-"*32)
     
     def save_graph(self, sess):
         self.writer.add_graph(sess.graph)

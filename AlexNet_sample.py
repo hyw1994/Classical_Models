@@ -25,7 +25,7 @@ with tf.Session(config=tf.ConfigProto(
     BATCH_SIZE = 128
     EPOCH = 2
     INPUT_SIZE=cifar100_info.splits["train"].num_examples
-
+    iter_number = (int)(INPUT_SIZE / BATCH_SIZE) + 1
     train_ds, iterator, ds_initializer = utils.prepare_train_ds(cifar100_train, BATCH_SIZE, INPUT_SIZE)
 
 
@@ -44,4 +44,4 @@ with tf.Session(config=tf.ConfigProto(
     else:
       alexnet.build(image_batch, label_batch)
     alexnet.save_graph(sess)
-    alexnet.train(sess, EPOCH)
+    alexnet.train(sess, EPOCH, iter_number)
