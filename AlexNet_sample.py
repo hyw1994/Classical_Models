@@ -16,35 +16,30 @@ else: print('Found GPU at: {}'.format(device_name))
 # Step 1: Load dataset from 102 category flower dataset 
 with tf.Session(config=tf.ConfigProto(
       allow_soft_placement=True, log_device_placement=False)) as sess:
-    # Use ImageNet 2012, which has 1000 categories.
-    # imageNet_train = tfds.load(name="imagenet2012", split=tfds.Split.TRAIN.subsplit(tfds.percent[: 10]), as_supervised=True)
-    
     # Use cifar100, which has 100 categories with size 32*32
     # Preproceess the images and set the hyperparameters
-    cifar100_train, cifar100_info = tfds.load(name="cifar100", split=tfds.Split.TRAIN, as_supervised=True, with_info=True)
-    
+    cifar100_train, cifar100_info = tfds.load(name="cifar100", split=tfds.Split.TRAIN, as_supervised=True, with_info=True)  
     BATCH_SIZE = 128
     EPOCH = 2
     INPUT_SIZE=cifar100_info.splits["train"].num_examples
     BUFFER_SIZE = 8000
+    NUM_CLASSES = cifar100_info.features['label'].num_classes
     iter_number = (int)(INPUT_SIZE / BATCH_SIZE) + 1
     train_ds, iterator, ds_initializer = utils.prepare_train_ds(cifar100_train, BATCH_SIZE, BUFFER_SIZE)
 
-    train_numpy = tfds.as_numpy(train_ds)
     # Use third party images, this code is no longer fit to this model!
+    # BATCH_SIZE = 128
+    # EPOCH = 2
+    # INPUT_SIZE=8189
+    # BUFFER_SIZE = 8000
+    # NUM_CLASSES = 102
+    # iter_number = (int)(INPUT_SIZE / BATCH_SIZE) + 1
     # image_root, label_root = utils.download_images()
     # train_ds, cv_ds, test_ds = utils.load_data(image_root, label_root)
-    # train_ds, iterator initializer = utils.prepare_train_ds(train_ds, BATCH_SIZE, INPUT_SIZE)
+    # train_ds, iterator, ds_initializer = utils.prepare_train_ds(train_ds, BATCH_SIZE, BUFFER_SIZE)
 
-    # image_batch, label_batch = iterator.get_next()
-    # sess.run(ds_initializer)
-
-    # plt.imshow(sess.run(image_batch)[0])
-    alexnet = AlexNet(cifar100_info.features['label'].num_classes)
-    if(tf.test.is_gpu_available()):
-        with tf.device('/gpu:0'):
-            alexnet.build()
-    else:
-        alexnet.build()
+    train_numpy = tfds.as_numpy(train_ds)
+    alexnet = AlexNet(NUM_CLASSES)
+    alexnet.build()
     alexnet.save_graph(sess)
     alexnet.train(sess, EPOCH, iter_number, train_numpy)

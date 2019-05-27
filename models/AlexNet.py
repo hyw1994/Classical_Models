@@ -1,6 +1,7 @@
 import tensorflow as tf
 import csv
 import matplotlib.pyplot as plt
+import numpy as np
 from . import utils
 
 # This is the AlexNet model introduced by the paper "ImageNet Classification with Deep Convolutional Neural Networks".
@@ -189,7 +190,7 @@ class AlexNet:
 
         with tf.name_scope('accuracy'):
             # Performance Measured
-            self.correct_prediction = tf.equal(self.y_train_true, self.y_train_pred)
+            self.correct_prediction = tf.equal(self.y_train_cls, self.y_train_pred_cls)
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
             tf.summary.scalar('accuracy', self.accuracy)
 
@@ -214,20 +215,15 @@ class AlexNet:
             print("-"*32)
             for step in range(iter_number):
                 image_batch, label_batch = next(train_numpy)
-                # print(image_batch[0].shape)
-                # plt.imshow(image_batch[0])
-                # plt.show()
-                # print(label_batch[0])
                 feed_dict_train = {self.x_image: image_batch, self.y_true: label_batch}
                 feed_dict_test = {self.x_image: image_batch, self.y_true: label_batch, self.dropout_rate: 1.0}
                 if step % 5 == 0:
                     s = sess.run(merged_summary, feed_dict=feed_dict_train)
                     self.writer.add_summary(s, step)
                 _ = sess.run(self.optimizer, feed_dict=feed_dict_train)
-                acc = sess.run(self.accuracy, feed_dict=feed_dict_train)
-                # train = sess.run([self.fc6_layer], feed_dict=feed_dict_train)
-                # print(train)
-                print("EPOCH: {}, step: {} accuracy: {}".format(epoch+1, step, acc))
+                acc, cost = sess.run([self.accuracy, self.cost], feed_dict=feed_dict_train)
+                print("EPOCH: {}, step: {}, accuracy: {}, loss: {}".format(epoch+1, step, acc, cost))
+                print('-'*32)
             print("-"*32)
     
     def save_graph(self, sess):

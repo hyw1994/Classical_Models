@@ -136,9 +136,7 @@ def get_image_index(image_path):
 
 def preprocess_image(raw_image):
     image = tf.image.decode_jpeg(raw_image, channels=3)
-    image_final = tf.image.resize_images(image, [227, 227])
-    image_final = image_final / 255.0
-    return image_final 
+    return image 
 
 def load_and_preprocess_image(path, labels):
     raw_image = tf.read_file(path)
@@ -161,15 +159,13 @@ def load_labels_and_image_path(image_root, label_root):
     return all_image_paths, all_image_labels
 
 def split_train_cv_test_set(images, labels):
-    train_pair = (images[0: 6142], labels[0: 6142, :])
-    cv_pair = (images[6142: 7143], labels[6142: 7143, :])
-    test_pair = (images[6142: 7143], labels[6142: 7143, :])
+    train_pair = (images[0: 6142], labels[0: 6142])
+    cv_pair = (images[6142: 7143], labels[6142: 7143])
+    test_pair = (images[6142: 7143], labels[6142: 7143])
     return train_pair, cv_pair, train_pair
 
 def load_data(image_root, label_root):
     all_image_paths, all_image_labels = load_labels_and_image_path(image_root, label_root)
-    all_image_labels = tf.one_hot(all_image_labels, depth=102, axis=-1)
-
     train_pair, cv_pair, test_pair = split_train_cv_test_set(all_image_paths, all_image_labels)
 
     train_path_ds = tf.data.Dataset.from_tensor_slices(train_pair)
