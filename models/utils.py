@@ -104,7 +104,6 @@ def new_fc_layer(input,
         tf.summary.histogram(name+'weights', weights)
         tf.summary.histogram(name+'biases', biases)
         tf.summary.histogram(name+'activations', layer)
-        tf.summary.scalar('dropout_rate', dropout_rate)
 
         return layer
 
