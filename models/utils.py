@@ -84,7 +84,9 @@ def new_fc_layer(input,
                  num_inputs,
                  num_outputs,
                  use_relu=True,
-                 use_dropout=False, name='fc'):
+                 use_dropout=True, 
+                 dropout_rate=tf.placeholder_with_default(0.5, shape=()),
+                 name='fc'):
     with tf.name_scope(name):
         # Create new weights and biases.
         weights = new_weights(shape=[num_inputs, num_outputs], name=name)
@@ -96,12 +98,13 @@ def new_fc_layer(input,
             layer = tf.nn.relu(layer, name=name+'-relu')
         
         if use_dropout:
-            layer = tf.nn.dropout(layer, rate=0.5, name=name+'-dropout')
+            layer = tf.nn.dropout(layer, rate=dropout_rate, name=name+'-dropout')
 
         # summary
         tf.summary.histogram(name+'weights', weights)
         tf.summary.histogram(name+'biases', biases)
         tf.summary.histogram(name+'activations', layer)
+        tf.summary.scalar('dropout_rate', dropout_rate)
 
         return layer
 
@@ -195,7 +198,7 @@ def prepare_train_ds(train_ds, BATCH_SIZE, INPUT_SIZE):
     train_ds = train_ds.shuffle(buffer_size=INPUT_SIZE)
     train_ds = train_ds.repeat()
     train_ds = train_ds.batch(BATCH_SIZE)
-    if(tf.test.is_gpu_available):
+    if(tf.test.is_gpu_available()):
         # If gpu can be used , we copy the data to gpu in advance.
         train_ds = train_ds.apply(tf.data.experimental.copy_to_device('/gpu:0'))
     # Prefetch the data to accerlate the training process. 

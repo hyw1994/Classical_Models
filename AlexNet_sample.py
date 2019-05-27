@@ -3,6 +3,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 import matplotlib.pyplot as plt
 import random
+import numpy as np
 from models.AlexNet import AlexNet
 from models import utils
 
@@ -25,23 +26,25 @@ with tf.Session(config=tf.ConfigProto(
     BATCH_SIZE = 128
     EPOCH = 2
     INPUT_SIZE=cifar100_info.splits["train"].num_examples
+    BUFFER_SIZE = 8000
     iter_number = (int)(INPUT_SIZE / BATCH_SIZE) + 1
-    train_ds, iterator, ds_initializer = utils.prepare_train_ds(cifar100_train, BATCH_SIZE, INPUT_SIZE)
+    train_ds, iterator, ds_initializer = utils.prepare_train_ds(cifar100_train, BATCH_SIZE, BUFFER_SIZE)
 
-
+    train_numpy = tfds.as_numpy(train_ds)
     # Use third party images, this code is no longer fit to this model!
     # image_root, label_root = utils.download_images()
     # train_ds, cv_ds, test_ds = utils.load_data(image_root, label_root)
     # train_ds, iterator initializer = utils.prepare_train_ds(train_ds, BATCH_SIZE, INPUT_SIZE)
 
-    image_batch, label_batch = iterator.get_next()
-    sess.run(ds_initializer)
+    # image_batch, label_batch = iterator.get_next()
+    # sess.run(ds_initializer)
+
     # plt.imshow(sess.run(image_batch)[0])
     alexnet = AlexNet(cifar100_info.features['label'].num_classes)
-    if(tf.test.is_gpu_available):
-      with tf.device('/gpu:0'):
-        alexnet.build(image_batch, label_batch)
+    if(tf.test.is_gpu_available()):
+        with tf.device('/gpu:0'):
+            alexnet.build()
     else:
-      alexnet.build(image_batch, label_batch)
+        alexnet.build()
     alexnet.save_graph(sess)
-    alexnet.train(sess, EPOCH, iter_number)
+    alexnet.train(sess, EPOCH, iter_number, train_numpy)

@@ -1,5 +1,6 @@
 import tensorflow as tf
 import csv
+import matplotlib.pyplot as plt
 from . import utils
 
 # This is the AlexNet model introduced by the paper "ImageNet Classification with Deep Convolutional Neural Networks".
@@ -23,12 +24,11 @@ from . import utils
 class AlexNet:
     def __init__(self, num_classes):
         super().__init__()
-
         # Step 1: Define the network
         # Input image.
-        self.image_size = 227
-        self.image_channel = 3
         self.num_classes = num_classes
+        self.x_image = tf.placeholder(tf.float32, shape=[None, 227, 227, 3])
+        self.y_true = tf.placeholder(tf.int64, shape=[None])
 
         # Convolutional Layer 1.
         self.conv1_params = {
@@ -96,18 +96,11 @@ class AlexNet:
         self.fc8_size = self.num_classes
         self.writer = tf.summary.FileWriter('models/computational_graph/AlexNet')
 
-        # Step 4: Build network
-        # Input layer and Output classes
-        # self.x_image = tf.placeholder(tf.float32, shape=[None, self.image_size, self.image_size, self.image_channel], name="x_train_image")
-        # self.y_train_true = tf.placeholder(tf.float32, shape=[None, self.num_classes], name="y_train_true")
-        # self.y_train_cls = tf.argmax(self.y_train_true, axis=1)
-
-    def build(self, image_batch, label_batch):
-        self.x_image = image_batch
-        self.y_train_true = tf.one_hot(label_batch, depth=self.num_classes, axis=1)
-        # CONV1 layer
+    def build(self):
+        self.y_train_true = tf.one_hot(self.y_true, depth=self.num_classes, axis=1)
+        # Conv1: 96 11*11 filters, stride 4, relu 0, local response normalization, max pooing with z=3, s=2.
         self.conv1_layer, self.weight1 = utils.new_conv_layer(input=self.x_image,
-                                        num_input_channels=self.image_channel,
+                                        num_input_channels=3,
                                         filter_size=self.conv1_params.get('filter_size'),
                                         num_filters=self.conv1_params.get('num_filters'),
                                         stride=self.conv1_params.get('stride'),
@@ -118,7 +111,7 @@ class AlexNet:
                                         use_pooling=self.conv1_params.get('use_pooling'), 
                                         name='conv1')
 
-        # CONV2 layer
+        # Conv2: pad 2 256 5*5 filters, stride 1, relu 1, local response normalization, max pooing with z=3, s=2.
         self.conv2_layer, self.weight2 = utils.new_conv_layer(input=self.conv1_layer,
                                         num_input_channels=self.conv1_params.get('num_filters'),
                                         filter_size=self.conv2_params.get('filter_size'),
@@ -131,7 +124,7 @@ class AlexNet:
                                         use_pooling=self.conv2_params.get('use_pooling'),
                                         name='conv2')
 
-        # CONV3 layer
+        # Conv3: pad 1 384 3*3 filters, stride 1, relu 0.
         self.conv3_layer, self.weight3 = utils.new_conv_layer(input=self.conv2_layer,
                                         num_input_channels=self.conv2_params.get('num_filters'),
                                         filter_size=self.conv3_params.get('filter_size'),
@@ -144,7 +137,7 @@ class AlexNet:
                                         use_pooling=self.conv3_params.get('use_pooling'),
                                         name='conv3')
 
-        # CONV4 layer
+        # Conv4: pad1 384 3*3 filters, stride 1,relu 0.
         self.conv4_layer, self.weight4 = utils.new_conv_layer(input=self.conv3_layer,
                                         num_input_channels=self.conv3_params.get('num_filters'),
                                         filter_size=self.conv4_params.get('filter_size'),
@@ -157,7 +150,7 @@ class AlexNet:
                                         use_pooling=self.conv4_params.get('use_pooling'),
                                         name='conv4')
 
-        # CONV5 layer
+        # Conv5: pad1 384 3*3 filters, stride 1,relu 1, max pooing with z=3, s=2.
         self.conv5_layer, self.weight5 = utils.new_conv_layer(input=self.conv4_layer,
                                         num_input_channels=self.conv4_params.get('num_filters'),
                                         filter_size=self.conv5_params.get('filter_size'),
@@ -173,10 +166,11 @@ class AlexNet:
         # Flatten the last CONV layer
         self.flattened_layer, self.num_features = utils.flatten_layer(self.conv5_layer, name='flatten')
 
-        # FC layers
-        self.fc6_layer = utils.new_fc_layer(self.flattened_layer, num_inputs=self.num_features, num_outputs=self.fc6_size, use_dropout=True, name='fc6')
-        self.fc7_layer = utils.new_fc_layer(self.fc6_layer, num_inputs=self.fc6_size, num_outputs=self.fc7_size, use_dropout=True, name='fc7')
-        self.fc8_layer = utils.new_fc_layer(self.fc7_layer, num_inputs=self.fc7_size, num_outputs=self.fc8_size, name='fc8')
+        # FC layers, 4096, 4096, 100
+        self.dropout_rate = tf.placeholder_with_default(0.5, shape=())
+        self.fc6_layer = utils.new_fc_layer(self.flattened_layer, num_inputs=self.num_features, num_outputs=self.fc6_size, dropout_rate=self.dropout_rate, name='fc6')
+        self.fc7_layer = utils.new_fc_layer(self.fc6_layer, num_inputs=self.fc6_size, num_outputs=self.fc7_size, dropout_rate=self.dropout_rate, name='fc7')
+        self.fc8_layer = utils.new_fc_layer(self.fc7_layer, num_inputs=self.fc7_size, num_outputs=self.fc8_size, use_relu=False, use_dropout=False, name='fc8')
         
         with tf.name_scope('loss'):
             # loss function
@@ -189,16 +183,16 @@ class AlexNet:
             
             tf.summary.scalar('cross_entropy_loss', self.cost)
 
-        
         with tf.name_scope('optimizer'):
             # optimizer
-            self.optimizer = tf.train.AdamOptimizer(learning_rate=0.001).minimize(self.cost)
+            self.optimizer = tf.train.AdamOptimizer(learning_rate=0.0001).minimize(self.cost)
 
         with tf.name_scope('accuracy'):
             # Performance Measured
             self.correct_prediction = tf.equal(self.y_train_true, self.y_train_pred)
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
             tf.summary.scalar('accuracy', self.accuracy)
+
         print('-' * 32)
         print("The model has been built successfully!")
         print("The model structure is:")
@@ -213,16 +207,26 @@ class AlexNet:
         print(self.fc8_layer)
         print('-' * 32)
 
-    def train(self, sess, EPOCH, iter_number):
+    def train(self, sess, EPOCH, iter_number, train_numpy):
         sess.run(tf.global_variables_initializer())
         merged_summary = tf.summary.merge_all()
         for epoch in range(EPOCH):
             print("-"*32)
             for step in range(iter_number):
+                image_batch, label_batch = next(train_numpy)
+                # print(image_batch[0].shape)
+                # plt.imshow(image_batch[0])
+                # plt.show()
+                # print(label_batch[0])
+                feed_dict_train = {self.x_image: image_batch, self.y_true: label_batch}
+                feed_dict_test = {self.x_image: image_batch, self.y_true: label_batch, self.dropout_rate: 1.0}
                 if step % 5 == 0:
-                    s = sess.run(merged_summary)
+                    s = sess.run(merged_summary, feed_dict=feed_dict_train)
                     self.writer.add_summary(s, step)
-                _, acc = sess.run([self.optimizer, self.accuracy])
+                _ = sess.run(self.optimizer, feed_dict=feed_dict_train)
+                acc = sess.run(self.accuracy, feed_dict=feed_dict_train)
+                # train = sess.run([self.fc6_layer], feed_dict=feed_dict_train)
+                # print(train)
                 print("EPOCH: {}, step: {} accuracy: {}".format(epoch+1, step, acc))
             print("-"*32)
     
