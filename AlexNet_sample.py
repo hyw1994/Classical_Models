@@ -7,6 +7,7 @@ import numpy as np
 from models.AlexNet import AlexNet
 from models import utils
 
+# Deetect if GPU is ready to use.
 device_name = tf.test.gpu_device_name()
 if device_name != '/device:GPU:0':
   print("GPU device not found, use cpu instead!")
@@ -20,7 +21,7 @@ with tf.Session(config=tf.ConfigProto(
     # Preproceess the images and set the hyperparameters
     cifar100_train, cifar100_info = tfds.load(name="cifar100", split=tfds.Split.TRAIN, as_supervised=True, with_info=True)  
     BATCH_SIZE = 128
-    EPOCH = 2
+    EPOCH = 7
     INPUT_SIZE=cifar100_info.splits["train"].num_examples
     BUFFER_SIZE = 8000
     NUM_CLASSES = cifar100_info.features['label'].num_classes
@@ -29,7 +30,7 @@ with tf.Session(config=tf.ConfigProto(
 
     # Use third party images with 102 categories flowers.
     # BATCH_SIZE = 128
-    # EPOCH = 2
+    # EPOCH = 7
     # INPUT_SIZE=8189
     # BUFFER_SIZE = 8000
     # NUM_CLASSES = 102

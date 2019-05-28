@@ -1,13 +1,11 @@
+'''This is the AlexNet model introduced by the paper "ImageNet Classification with Deep Convolutional Neural Networks".'''
 import tensorflow as tf
-import csv
 import matplotlib.pyplot as plt
 import numpy as np
 from . import utils
 
-# This is the AlexNet model introduced by the paper "ImageNet Classification with Deep Convolutional Neural Networks".
-
 # The network contains five CONV layer and three FC layer. The detailed layer information of the modele is: 
-# [227*227*3] INPUT LAYER: 1.2 million training images, 50,000 validation inages, 150,000 testing images with size 227*227*3, 0 padding. 
+# [227*227*3] INPUT LAYER: reshape the image and divide the image by 255.0 to rescale the distribution to [0, 1]. 
 # [55*55*96] CONV1 LAYER: 96 11*11*3, stride 4, pad 0, ReLU activation.
 # [55*55*96] RESPONSE NORM LAYER;
 # [27*27*96] MAX POOLING1 LAYER: 3*3, stride 2.
