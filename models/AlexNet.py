@@ -216,12 +216,12 @@ class AlexNet:
             for step in range(iter_number):
                 image_batch, label_batch = next(train_numpy)
                 feed_dict_train = {self.x_image: image_batch, self.y_true: label_batch}
-                feed_dict_test = {self.x_image: image_batch, self.y_true: label_batch, self.dropout_rate: 1.0}
+                feed_dict_test = {self.x_image: image_batch, self.y_true: label_batch, self.dropout_rate: 0.0}
                 if step % 5 == 0:
                     s = sess.run(merged_summary, feed_dict=feed_dict_train)
                     self.writer.add_summary(s, step)
                 _ = sess.run(self.optimizer, feed_dict=feed_dict_train)
-                acc, cost = sess.run([self.accuracy, self.cost], feed_dict=feed_dict_train)
+                acc, cost = sess.run([self.accuracy, self.cost], feed_dict=feed_dict_test)
                 print("EPOCH: {}, step: {}, accuracy: {}, loss: {}".format(epoch+1, step, acc, cost))
                 print('-'*32)
             print("-"*32)

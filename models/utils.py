@@ -193,14 +193,7 @@ def prepare_train_ds(train_ds, BATCH_SIZE, INPUT_SIZE):
     train_ds = train_ds.shuffle(buffer_size=INPUT_SIZE)
     train_ds = train_ds.repeat()
     train_ds = train_ds.batch(BATCH_SIZE)
-    if(tf.test.is_gpu_available()):
-        # If gpu can be used , we copy the data to gpu in advance.
-        train_ds = train_ds.apply(tf.data.experimental.copy_to_device('/gpu:0'))
     # Prefetch the data to accerlate the training process. 
     train_ds = train_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
-    # Build iterator to iterate through batches.
-    iterator = tf.data.Iterator.from_structure(train_ds.output_types, train_ds.output_shapes)
-    ds_initializer = iterator.make_initializer(train_ds)
-
-    return train_ds, iterator, ds_initializer
+    return train_ds
