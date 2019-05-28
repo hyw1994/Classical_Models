@@ -3,9 +3,12 @@ import pathlib
 import scipy.io as scio
 import random
 
-def new_weights(shape, name):
+def new_weights(shape, name, use_xavier=False):
     # Create tf.Variable for filters.
-    return tf.Variable(tf.random.truncated_normal(shape, stddev=0.01), name=name+'-W')
+    if(use_xavier):
+        return tf.Variable(tf.glorot_uniform_initializer(shape), name=name+'-W')
+    else:
+        return tf.Variable(tf.random.truncated_normal(shape, stddev=0.01), name=name+'-W')
 
 def new_biases(length, value, name):
     # Create tf.Variable for bias.
@@ -20,7 +23,9 @@ def new_conv_layer(input,              # The previous layer.
                    use_bias = True,    # Use bias or not.
                    bias_value = 0.0,   # How to initialize the bias.
                    use_norm = False,   # Use norm or not.
-                   use_pooling=False,  # Use 2x2 max-pooling.
+                   use_pooling=False,  # Use 3x3 max-pooling by default.
+                   pool_size = 3,
+                   pool_stride = 2,
                    name='conv'): 
 
     # Shape of the filter-weights for the convolution.
@@ -67,8 +72,8 @@ def new_conv_layer(input,              # The previous layer.
         if use_pooling:
             # This is an overlapping 3x3 max-pooling, with stride 2.
             layer = tf.nn.max_pool(value=layer,
-                                ksize=[1, 3, 3, 1],
-                                strides=[1, 2, 2, 1],
+                                ksize=[1, pool_size, pool_size, 1],
+                                strides=[1, pool_stride, pool_stride, 1],
                                 padding='VALID', name=name+'-pooling')
 
         # summary
@@ -106,6 +111,15 @@ def new_fc_layer(input,
         tf.summary.histogram(name+'activations', layer)
 
         return layer
+
+def new_pooling_layer(input, pool_size, pool_stride, name):
+    layer = tf.nn.max_pool(value=input, 
+                           ksize=[1, pool_size, pool_size, 1],
+                           strides=[1, pool_stride, pool_stride, 1],
+                           padding='VALID', name=name+'-pooling')
+    # summary
+    tf.summary.histogram(name+'pooling', layer)
+    return layer
 
 def flatten_layer(layer, name):
     with tf.name_scope(name):
