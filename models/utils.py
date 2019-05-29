@@ -6,7 +6,7 @@ import random
 def new_weights(shape, name, use_xavier=False):
     # Create tf.Variable for filters.
     if(use_xavier):
-        return tf.Variable(tf.glorot_uniform_initializer(shape), name=name+'-W')
+        return tf.Variable(tf.glorot_uniform_initializer()(shape), name=name+'-W')
     else:
         return tf.Variable(tf.random.truncated_normal(shape, stddev=0.01), name=name+'-W')
 
@@ -26,7 +26,10 @@ def new_conv_layer(input,              # The previous layer.
                    use_pooling=False,  # Use 3x3 max-pooling by default.
                    pool_size = 3,
                    pool_stride = 2,
-                   name='conv'): 
+                   name='conv',
+                   layers_collection = [],
+                   weights_collection = [],
+                   use_xavier=False): 
 
     # Shape of the filter-weights for the convolution.
     # This format is determined by the TensorFlow API.
@@ -43,7 +46,7 @@ def new_conv_layer(input,              # The previous layer.
                             mode='CONSTANT', name=name + '-padding')
 
         # Create new weights aka. filters with the given shape.
-        weights = new_weights(shape=filter_shape, name=name)
+        weights = new_weights(shape=filter_shape, name=name, use_xavier=use_xavier)
             
         # Do the convolotion job with different parameters settings.
         layer = tf.nn.conv2d(input=layer,
@@ -83,6 +86,8 @@ def new_conv_layer(input,              # The previous layer.
 
         # We return both the resulting layer and the filter-weights
         # because we will plot the weights later.
+        layers_collection.append(layer)
+        weights_collection.append(weights)
         return layer, weights
 
 def new_fc_layer(input,
@@ -91,10 +96,13 @@ def new_fc_layer(input,
                  use_relu=True,
                  use_dropout=True, 
                  dropout_rate=tf.placeholder_with_default(0.5, shape=()),
-                 name='fc'):
+                 name='fc',
+                 layers_collection=[],
+                 weights_collection=[],
+                 use_xavier=False):
     with tf.name_scope(name):
         # Create new weights and biases.
-        weights = new_weights(shape=[num_inputs, num_outputs], name=name)
+        weights = new_weights(shape=[num_inputs, num_outputs], name=name, use_xavier=use_xavier)
         biases = new_biases(length=num_outputs, value=1.0, name=name)
         # Do the matrix multiple and get the output neurons.
         layer = tf.add(tf.matmul(input, weights), biases, name=name + '-add')
@@ -110,24 +118,30 @@ def new_fc_layer(input,
         tf.summary.histogram(name+'biases', biases)
         tf.summary.histogram(name+'activations', layer)
 
+        layers_collection.append(layer)
+        weights_collection.append(weights)
+        
+        return layer, weights
+
+def new_pooling_layer(input, pool_size, pool_stride, name, layers_collection=[]):
+    with tf.name_scope(name):
+        layer = tf.nn.max_pool(value=input, 
+                            ksize=[1, pool_size, pool_size, 1],
+                            strides=[1, pool_stride, pool_stride, 1],
+                            padding='VALID', name=name+'-pooling')
+        # summary
+        tf.summary.histogram(name+'pooling', layer)
+
+        layers_collection.append(layer)
         return layer
 
-def new_pooling_layer(input, pool_size, pool_stride, name):
-    layer = tf.nn.max_pool(value=input, 
-                           ksize=[1, pool_size, pool_size, 1],
-                           strides=[1, pool_stride, pool_stride, 1],
-                           padding='VALID', name=name+'-pooling')
-    # summary
-    tf.summary.histogram(name+'pooling', layer)
-    return layer
-
-def flatten_layer(layer, name):
+def flatten_layer(input, layers_collection=[], name='flatten'):
     with tf.name_scope(name):
         # This function is used to flat the final CONV layer to connect it to FC layer.
-        layer_shape = layer.get_shape()
+        layer_shape = input.get_shape()
         num_features = layer_shape[1:4].num_elements()
-        layer_flatten = tf.reshape(layer, [-1, num_features], name=name + '-flatten')
-
+        layer_flatten = tf.reshape(input, [-1, num_features], name=name + '-flatten')
+        layers_collection.append(layer_flatten)
         return layer_flatten, num_features
 
 def download_images():
@@ -191,17 +205,17 @@ def load_data(image_root, label_root):
 
     return train_ds, cv_ds, test_ds
 
-def pre_process_ds_images(image, label):
+def pre_process_ds_images(image, label, size=227):
     """ reshape the image to [227, 227] and one-hot the labels to fit the network."""
     image = tf.cast(image, tf.float32)
-    image = tf.image.resize_images(images=image, size=[227, 227])
+    image = tf.image.resize_images(images=image, size=[size, size])
     image = image/255.0
     return image, label
 
-def prepare_train_ds(train_ds, BATCH_SIZE, INPUT_SIZE):
+def prepare_train_ds(train_ds, BATCH_SIZE, INPUT_SIZE, image_size=227):
     """We shuffle and batch the training samples to make the training process work better."""
     # Resize the input image size.
-    train_ds = train_ds.map(pre_process_ds_images) 
+    train_ds = train_ds.map(lambda image, label: pre_process_ds_images(image, label, size=image_size)) 
 
     # We prepare the shuffle buffer to be the same size as the whole size of the input sample to make it shuffle globally.
     train_ds = train_ds.shuffle(buffer_size=INPUT_SIZE)

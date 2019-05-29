@@ -17,10 +17,10 @@ from . import utils
 
 # [2, 2]          [112, 112, 64]  MAX POOLING1 LAYER: size=2, stride=2.
 
-# [128, 3, 3]     [112, 112, 64]  CONV2_1 LAYER: 128 filters with size [3, 3] and stride=1, pad=1, activation=ReLU.
-# [128, 3, 3]     [112, 112, 64]  CONV2_2 LAYER: 128 filters with size [3, 3] and stride=1, pad=1, activation=ReLU.
+# [128, 3, 3]     [112, 112, 128]  CONV2_1 LAYER: 128 filters with size [3, 3] and stride=1, pad=1, activation=ReLU.
+# [128, 3, 3]     [112, 112, 128]  CONV2_2 LAYER: 128 filters with size [3, 3] and stride=1, pad=1, activation=ReLU.
 
-# [2, 2]          [56, 56, 64]    MAX POOLING2 LAYER: size=2, stride=2.
+# [2, 2]          [56, 56, 128]    MAX POOLING2 LAYER: size=2, stride=2.
 
 # [256, 3, 3]     [56, 56, 256]   CONV3_1 LAYER: 256 filters with size [3, 3] and stride=1, pad=1, activation=ReLU.
 # [256, 3, 3]     [56, 56, 256]   CONV3_2 LAYER: 256 filters with size [3, 3] and stride=1, pad=1, activation=ReLU.
@@ -46,6 +46,8 @@ from . import utils
 
 # [2, 2]          [7, 7, 512]     MAX POOLING5 LAYER: size=2, stride=2.
 
+# [25088]                         FLATTEN LAYER: 7*7*512
+
 # [4096]          [4096]          FC1: 4096 neurons, ReLU, dropout=0.5.
 # [4096]          [4096]          FC2: 4096 neurons, ReLU, dropout=0.5.
 # [1000]          [1000]          FC3: 1000 neurons, Softmax. change it to the categories size while using.
@@ -56,8 +58,8 @@ class VGG():
         # Specify the network type, VGG16 or VGG19.
         self.num_classes = num_classes
         # Input image.
-        self.x_image = tf.placeholder(tf.float32, shape=[None, 224, 224, 3])
-        self.y_true_cls = tf.placeholder(tf.int64, shape=[None])
+        self.x_image = tf.placeholder(tf.float32, shape=[None, 224, 224, 3], name='x_image')
+        self.y_true_cls = tf.placeholder(tf.int64, shape=[None], name='y_true_cls')
         
         self.training_info = {'batch_size': 256, 'image_shape': 224, 'momentum': 0.9, 'l2lambda': 5e-4, 'learning_rate': 1e-2}
         self.layer_info = {'paddings': 1, 'conv_size':3, 'conv_stride': 1, 'pool_size':2, 'pool_stride': 2, 'bias_value': 0, 'use_xavier': True}
@@ -75,177 +77,295 @@ class VGG():
         self.fc1 = 4096
         self.fc2 = 4096
         self.fc3 = self.num_classes
+        self.writer = tf.summary.FileWriter('models/computational_graph/VGG/test')
 
     def build(self, type='VGG16'):
-        self.model_type = type
+        '''Build the network with the type given (VGG16 or VGG19).'''
+        if(type == 'VGG16' or type == 'vgg16' or type == 'VGG19' or type == 'vgg19'):
+            self.model_type = type
+        else:
+            raise ValueError("Unsupported model type: {}, use 'VGG16' or 'VGG19' only.".format(type))
+        
         print("The model in use is: {}".format(self.model_type))
-        self.y_true = tf.one_hot(self.y_true_cls, depth=self.num_classes, axis=1)
+
+        self.y_true = tf.one_hot(self.y_true_cls, depth=self.num_classes, axis=1, name='y_true')
+        self.l2_loss = 0
+        self.layers_collection = []
+        self.weights_collection = []
+
         # Build conv1 layer.
-        self.conv1_1_layer = utils.new_conv_layer(input=self.x_image,
+        self.conv1_1_layer, self.weight1_1 = utils.new_conv_layer(input=self.x_image,
                                                   num_input_channels=3,
                                                   paddings=self.layer_info.get('paddings'),
                                                   filter_size=self.layer_info.get('conv_size'),
                                                   stride=self.layer_info.get('conv_stride'),
                                                   num_filters=self.conv1.get('num_filters'),
+                                                  use_xavier=True,
+                                                  layers_collection = self.layers_collection,
+                                                  weights_collection = self.weights_collection,
                                                   name='conv1_1')
-        
-        self.conv1_2_layer = utils.new_conv_layer(input=self.conv1_1_layer,
+
+        self.conv1_2_layer, self.weight1_2 = utils.new_conv_layer(input=self.conv1_1_layer,
                                                   num_input_channels=self.conv1.get('num_filters'),
                                                   paddings=self.layer_info.get('paddings'),
                                                   filter_size=self.layer_info.get('conv_size'),
                                                   stride=self.layer_info.get('conv_stride'),
                                                   num_filters=self.conv1.get('num_filters'),
+                                                  use_xavier=True,
+                                                  layers_collection = self.layers_collection,
+                                                  weights_collection = self.weights_collection,
                                                   name='conv1_2')
         
         self.pool1_layer = utils.new_pooling_layer(input=self.conv1_2_layer, 
                                                    pool_size=self.layer_info.get('pool_size'),
                                                    pool_stride=self.layer_info.get('pool_stride'),
+                                                   layers_collection = self.layers_collection,
                                                    name='pool1')
 
         # Build conv2 layer.
-        self.conv2_1_layer = utils.new_conv_layer(input=self.pool1_layer,
+        self.conv2_1_layer, self.weight2_1 = utils.new_conv_layer(input=self.pool1_layer,
                                                   num_input_channels=self.conv1.get('num_filters'),
                                                   paddings=self.layer_info.get('paddings'),
                                                   filter_size=self.layer_info.get('conv_size'),
                                                   stride=self.layer_info.get('conv_stride'),
                                                   num_filters=self.conv2.get('num_filters'),
+                                                  use_xavier=True,
+                                                  layers_collection = self.layers_collection,
+                                                  weights_collection = self.weights_collection,
                                                   name='conv2_1')
         
-        self.conv2_2_layer = utils.new_conv_layer(input=self.conv2_1_layer,
+        self.conv2_2_layer, self.weight2_2 = utils.new_conv_layer(input=self.conv2_1_layer,
                                                   num_input_channels=self.conv2.get('num_filters'),
                                                   paddings=self.layer_info.get('paddings'),
                                                   filter_size=self.layer_info.get('conv_size'),
                                                   stride=self.layer_info.get('conv_stride'),
                                                   num_filters=self.conv2.get('num_filters'),
+                                                  use_xavier=True,
+                                                  layers_collection = self.layers_collection,
+                                                  weights_collection = self.weights_collection,
                                                   name='conv2_2')
 
         self.pool2_layer = utils.new_pooling_layer(input=self.conv2_2_layer, 
                                                    pool_size=self.layer_info.get('pool_size'),
                                                    pool_stride=self.layer_info.get('pool_stride'),
+                                                   layers_collection = self.layers_collection,
                                                    name='pool2')
 
         # Build conv3 layer.
-        self.conv3_1_layer = utils.new_conv_layer(input=self.conv2_2_layer,
-                                                  num_input_channels=self.conv2.get('num_filters'),
-                                                  paddings=self.layer_info.get('paddings'),
-                                                  filter_size=self.layer_info.get('conv_size'),
-                                                  stride=self.layer_info.get('conv_stride'),
-                                                  num_filters=self.conv3.get('num_filters'),
-                                                  name='conv3_1')
+        self.conv3_1_layer, self.weight3_1 = utils.new_conv_layer(input=self.pool2_layer,
+                                                                  num_input_channels=self.conv2.get('num_filters'),
+                                                                  paddings=self.layer_info.get('paddings'),
+                                                                  filter_size=self.layer_info.get('conv_size'),
+                                                                  stride=self.layer_info.get('conv_stride'),
+                                                                  num_filters=self.conv3.get('num_filters'),
+                                                                  use_xavier=True,
+                                                                  layers_collection = self.layers_collection,
+                                                                  weights_collection = self.weights_collection,
+                                                                  name='conv3_1')
         
-        self.conv3_2_layer = utils.new_conv_layer(input=self.conv3_1_layer,
+        self.conv3_2_layer, self.weight3_2 = utils.new_conv_layer(input=self.conv3_1_layer,
                                                   num_input_channels=self.conv3.get('num_filters'),
                                                   paddings=self.layer_info.get('paddings'),
                                                   filter_size=self.layer_info.get('conv_size'),
                                                   stride=self.layer_info.get('conv_stride'),
                                                   num_filters=self.conv3.get('num_filters'),
+                                                  use_xavier=True,
+                                                  layers_collection = self.layers_collection,
+                                                  weights_collection = self.weights_collection,
                                                   name='conv3_2')
                                                   
-        self.conv3_3_layer = utils.new_conv_layer(input=self.conv3_2_layer,
+        self.conv3_3_layer, self.weight3_3 = utils.new_conv_layer(input=self.conv3_2_layer,
                                                   num_input_channels=self.conv3.get('num_filters'),
                                                   paddings=self.layer_info.get('paddings'),
                                                   filter_size=self.layer_info.get('conv_size'),
                                                   stride=self.layer_info.get('conv_stride'),
                                                   num_filters=self.conv3.get('num_filters'),
+                                                  use_xavier=True,
+                                                  layers_collection = self.layers_collection,
+                                                  weights_collection = self.weights_collection,
                                                   name='conv3_3')
-
         self.conv3_output = self.conv3_3_layer
-
+        
         if(self.model_type == 'VGG19' or self.model_type == 'vgg19'):
-            self.conv3_4_layer = utils.new_conv_layer(input=self.conv3_3_layer,
+            self.conv3_4_layer, self.weight3_4 = utils.new_conv_layer(input=self.conv3_3_layer,
                                                       num_input_channels=self.conv3.get('num_filters'),
                                                       paddings=self.layer_info.get('paddings'),
                                                       filter_size=self.layer_info.get('conv_size'),
                                                       stride=self.layer_info.get('conv_stride'),
                                                       num_filters=self.conv3.get('num_filters'),
+                                                      use_xavier=True,
+                                                      layers_collection = self.layers_collection,
+                                                      weights_collection = self.weights_collection,
                                                       name='conv3_4')
             self.conv3_output = self.conv3_4_layer
 
         self.pool3_layer = utils.new_pooling_layer(input=self.conv3_output, 
                                                    pool_size=self.layer_info.get('pool_size'),
                                                    pool_stride=self.layer_info.get('pool_stride'),
+                                                   layers_collection = self.layers_collection,
                                                    name='pool3')
 
         # Build conv4 layer.
-        self.conv4_1_layer = utils.new_conv_layer(input=self.pool3_layer,
+        self.conv4_1_layer, self.weight4_1 = utils.new_conv_layer(input=self.pool3_layer,
                                                   num_input_channels=self.conv3.get('num_filters'),
                                                   paddings=self.layer_info.get('paddings'),
                                                   filter_size=self.layer_info.get('conv_size'),
                                                   stride=self.layer_info.get('conv_stride'),
                                                   num_filters=self.conv4.get('num_filters'),
+                                                  use_xavier=True,
+                                                  layers_collection = self.layers_collection,
+                                                  weights_collection = self.weights_collection,
                                                   name='conv4_1')
         
-        self.conv4_2_layer = utils.new_conv_layer(input=self.conv4_1_layer,
+        self.conv4_2_layer, self.weight4_2 = utils.new_conv_layer(input=self.conv4_1_layer,
                                                   num_input_channels=self.conv4.get('num_filters'),
                                                   paddings=self.layer_info.get('paddings'),
                                                   filter_size=self.layer_info.get('conv_size'),
                                                   stride=self.layer_info.get('conv_stride'),
                                                   num_filters=self.conv4.get('num_filters'),
+                                                  use_xavier=True,
+                                                  layers_collection = self.layers_collection,
+                                                  weights_collection = self.weights_collection,
                                                   name='conv4_2')
                                                   
-        self.conv4_3_layer = utils.new_conv_layer(input=self.conv4_2_layer,
+        self.conv4_3_layer, self.weight4_3 = utils.new_conv_layer(input=self.conv4_2_layer,
                                                   num_input_channels=self.conv4.get('num_filters'),
                                                   paddings=self.layer_info.get('paddings'),
                                                   filter_size=self.layer_info.get('conv_size'),
                                                   stride=self.layer_info.get('conv_stride'),
                                                   num_filters=self.conv4.get('num_filters'),
+                                                  use_xavier=True,
+                                                  layers_collection = self.layers_collection,
+                                                  weights_collection = self.weights_collection,
                                                   name='conv4_3')
-
         self.conv4_output = self.conv4_3_layer
 
         if(self.model_type == 'VGG19' or self.model_type == 'vgg19'):
-            self.conv4_4_layer = utils.new_conv_layer(input=self.conv4_3_layer,
-                                                      num_input_channels=self.conv4.get('num_filters'),
-                                                      paddings=self.layer_info.get('paddings'),
-                                                      filter_size=self.layer_info.get('conv_size'),
-                                                      stride=self.layer_info.get('conv_stride'),
-                                                      num_filters=self.conv4.get('num_filters'),
-                                                      name='conv4_4')
+            self.conv4_4_layer, self.weight4_4 = utils.new_conv_layer(input=self.conv4_3_layer,
+                                                                      num_input_channels=self.conv4.get('num_filters'),
+                                                                      paddings=self.layer_info.get('paddings'),
+                                                                      filter_size=self.layer_info.get('conv_size'),
+                                                                      stride=self.layer_info.get('conv_stride'),
+                                                                      num_filters=self.conv4.get('num_filters'),
+                                                                      use_xavier=True,
+                                                                      layers_collection = self.layers_collection,
+                                                                      weights_collection = self.weights_collection,
+                                                                      name='conv4_4')
             self.conv4_output = self.conv4_4_layer
 
         self.pool4_layer = utils.new_pooling_layer(input=self.conv4_output, 
                                                    pool_size=self.layer_info.get('pool_size'),
                                                    pool_stride=self.layer_info.get('pool_stride'),
+                                                   layers_collection = self.layers_collection,
                                                    name='pool4')
         
         # Build conv5 layer.
-        self.conv5_1_layer = utils.new_conv_layer(input=self.pool4_layer,
-                                                  num_input_channels=self.conv4.get('num_filters'),
-                                                  paddings=self.layer_info.get('paddings'),
-                                                  filter_size=self.layer_info.get('conv_size'),
-                                                  stride=self.layer_info.get('conv_stride'),
-                                                  num_filters=self.conv5.get('num_filters'),
-                                                  name='conv5_1')
+        self.conv5_1_layer, self.weight5_1 = utils.new_conv_layer(input=self.pool4_layer,
+                                                                  num_input_channels=self.conv4.get('num_filters'),
+                                                                  paddings=self.layer_info.get('paddings'),
+                                                                  filter_size=self.layer_info.get('conv_size'),
+                                                                  stride=self.layer_info.get('conv_stride'),
+                                                                  num_filters=self.conv5.get('num_filters'),
+                                                                  use_xavier=True,
+                                                                  layers_collection = self.layers_collection,
+                                                                  weights_collection = self.weights_collection,
+                                                                  name='conv5_1')
         
-        self.conv5_2_layer = utils.new_conv_layer(input=self.conv5_1_layer,
-                                                  num_input_channels=self.conv5.get('num_filters'),
-                                                  paddings=self.layer_info.get('paddings'),
-                                                  filter_size=self.layer_info.get('conv_size'),
-                                                  stride=self.layer_info.get('conv_stride'),
-                                                  num_filters=self.conv5.get('num_filters'),
-                                                  name='conv5_2')
+        self.conv5_2_layer, self.weight5_2 = utils.new_conv_layer(input=self.conv5_1_layer,
+                                                                  num_input_channels=self.conv5.get('num_filters'),
+                                                                  paddings=self.layer_info.get('paddings'),
+                                                                  filter_size=self.layer_info.get('conv_size'),
+                                                                  stride=self.layer_info.get('conv_stride'),
+                                                                  num_filters=self.conv5.get('num_filters'),
+                                                                  use_xavier=True,
+                                                                  layers_collection = self.layers_collection,
+                                                                  weights_collection = self.weights_collection,
+                                                                  name='conv5_2')
                                                   
-        self.conv5_3_layer = utils.new_conv_layer(input=self.conv5_2_layer,
-                                                  num_input_channels=self.conv5.get('num_filters'),
-                                                  paddings=self.layer_info.get('paddings'),
-                                                  filter_size=self.layer_info.get('conv_size'),
-                                                  stride=self.layer_info.get('conv_stride'),
-                                                  num_filters=self.conv5.get('num_filters'),
-                                                  name='conv5_3')
-
+        self.conv5_3_layer, self.weight5_3 = utils.new_conv_layer(input=self.conv5_2_layer,
+                                                                  num_input_channels=self.conv5.get('num_filters'),
+                                                                  paddings=self.layer_info.get('paddings'),
+                                                                  filter_size=self.layer_info.get('conv_size'),
+                                                                  stride=self.layer_info.get('conv_stride'),
+                                                                  num_filters=self.conv5.get('num_filters'),
+                                                                  use_xavier=True,
+                                                                  layers_collection = self.layers_collection,
+                                                                  weights_collection = self.weights_collection,
+                                                                  name='conv5_3')
         self.conv5_output = self.conv5_3_layer
 
         if(self.model_type == 'VGG19' or self.model_type == 'vgg19'):
-            self.conv5_4_layer = utils.new_conv_layer(input=self.conv5_3_layer,
-                                                      num_input_channels=self.conv5.get('num_filters'),
-                                                      paddings=self.layer_info.get('paddings'),
-                                                      filter_size=self.layer_info.get('conv_size'),
-                                                      stride=self.layer_info.get('conv_stride'),
-                                                      num_filters=self.conv5.get('num_filters'),
-                                                      name='conv5_4')
+            self.conv5_4_layer, self.weight5_4 = utils.new_conv_layer(input=self.conv5_3_layer,
+                                                                      num_input_channels=self.conv5.get('num_filters'),
+                                                                      paddings=self.layer_info.get('paddings'),
+                                                                      filter_size=self.layer_info.get('conv_size'),
+                                                                      stride=self.layer_info.get('conv_stride'),
+                                                                      num_filters=self.conv5.get('num_filters'),
+                                                                      use_xavier=True,
+                                                                      layers_collection = self.layers_collection,
+                                                                      weights_collection = self.weights_collection,
+                                                                      name='conv5_4')
             self.conv5_output = self.conv5_4_layer
 
         self.pool5_layer = utils.new_pooling_layer(input=self.conv5_output, 
                                                    pool_size=self.layer_info.get('pool_size'),
                                                    pool_stride=self.layer_info.get('pool_stride'),
+                                                   layers_collection = self.layers_collection,
                                                    name='pool5')
+        
+        # Build FC layers
+        self.flatten_layer, self.num_features = utils.flatten_layer(input=self.pool5_layer, name='flatten', layers_collection = self.layers_collection)
+        self.dropout_rate = tf.placeholder_with_default(0.5, shape=())
+        self.fc1_layer, self.weight_fc1 = utils.new_fc_layer(input=self.flatten_layer, num_inputs=self.num_features, num_outputs=self.fc1, dropout_rate=self.dropout_rate,use_xavier=True, layers_collection=self.layers_collection, weights_collection=self.weights_collection, name='fc1')
+        self.fc2_layer, self.weight_fc2 = utils.new_fc_layer(input=self.fc1_layer, num_inputs=self.fc1, num_outputs=self.fc2, dropout_rate=self.dropout_rate,use_xavier=True, layers_collection=self.layers_collection, weights_collection=self.weights_collection, name='fc2')
+        self.fc3_layer, self.weight_fc3 = utils.new_fc_layer(input=self.fc2_layer, num_inputs=self.fc2, num_outputs=self.fc3, use_relu=False, use_dropout=False,use_xavier=True, layers_collection=self.layers_collection, weights_collection=self.weights_collection, name='fc3')
+
+        with tf.name_scope('loss'):
+            # Build loss function
+            self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.y_true, logits=self.fc3_layer)
+            # Calculate the l2 loss.
+            for weight in self.weights_collection:
+                self.l2_loss = self.l2_loss + tf.nn.l2_loss(weight)
+            self.cost = tf.reduce_mean(self.cross_entropy) + self.training_info.get('l2lambda') * self.l2_loss
+
+            tf.summary.scalar('cross_entropy_loss', self.cost)
+        
+        with tf.name_scope('optimizer'):
+            # Build the optimizer
+            self.optimizer = tf.train.MomentumOptimizer(learning_rate=self.training_info.get('learning_rate'), momentum=self.training_info.get('momentum'), name='optimizer').minimize(loss=self.cost)
+
+        with tf.name_scope('accuracy'):
+            # Build the calculation to accuracy
+            self.y_pred = tf.nn.softmax(self.fc3_layer)
+            self.y_pred_cls = tf.argmax(self.y_pred, axis=1)
+            self.correct_prediction = tf.equal(self.y_true_cls, self.y_pred_cls)
+            self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
+            tf.summary.scalar('accuracy', self.accuracy)
+        
+        print('-'*32)
+        for layer in self.layers_collection:
+            print(layer)
+        print('-'*32)
+
+    def train(self, sess, EPOCH, iter_number, train_numpy):
+        '''Train the network with mini-batch input images with shape 224, 224.'''
+        sess.run(tf.global_variables_initializer())
+        merged_summary = tf.summary.merge_all()
+        for epoch in range(EPOCH):
+            print("-"*32)
+            for step in range(iter_number):
+                image_batch, label_batch = next(train_numpy)
+                feed_dict_train = {self.x_image: image_batch, self.y_true_cls: label_batch}
+                feed_dict_test = {self.x_image: image_batch, self.y_true_cls: label_batch, self.dropout_rate: 0.0}
+                if step % 5 == 0:
+                    s = sess.run(merged_summary, feed_dict=feed_dict_train)
+                    self.writer.add_summary(s, step)
+                _ = sess.run(self.optimizer, feed_dict=feed_dict_train)
+                acc, cost = sess.run([self.accuracy, self.cost], feed_dict=feed_dict_test)
+                print("EPOCH: {}, step: {}, accuracy: {}, loss: {}".format(epoch+1, step, acc, cost))
+                print('-'*32)
+            print("-"*32)
+        return
+
+    def save_graph(self, sess):
+        self.writer.add_graph(sess.graph)
