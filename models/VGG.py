@@ -4,6 +4,7 @@ import csv
 import matplotlib.pyplot as plt
 import numpy as np
 from . import utils
+from .model import model
 
 # VGG network architecture.
 # Initialization: 
@@ -52,10 +53,16 @@ from . import utils
 # [4096]          [4096]          FC2: 4096 neurons, ReLU, dropout=0.5.
 # [1000]          [1000]          FC3: 1000 neurons, Softmax. change it to the categories size while using.
 
-class VGG():
-    def __init__(self, num_classes):
-        super().__init__()
+class VGG(model):
+    def __init__(self, dataset_name, num_classes, model_type='VGG16'):
+        super().__init__(model_name=model_type, dataset_name=dataset_name)
         # Specify the network type, VGG16 or VGG19.
+        '''Build the network with the type given (VGG16 or VGG19).'''
+        if(model_type == 'VGG16' or model_type == 'vgg16' or model_type == 'VGG19' or model_type == 'vgg19'):
+            self.model_type = model_type
+        else:
+            raise ValueError("Unsupported model type: {}, use 'VGG16' or 'VGG19' only.".format(type))
+
         self.num_classes = num_classes
         # Input image.
         self.x_image = tf.placeholder(tf.float32, shape=[None, 224, 224, 3], name='x_image')
@@ -77,17 +84,9 @@ class VGG():
         self.fc1 = 4096
         self.fc2 = 4096
         self.fc3 = self.num_classes
-        self.writer = tf.summary.FileWriter('models/computational_graph/VGG/test')
 
-    def build(self, type='VGG16'):
-        '''Build the network with the type given (VGG16 or VGG19).'''
-        if(type == 'VGG16' or type == 'vgg16' or type == 'VGG19' or type == 'vgg19'):
-            self.model_type = type
-        else:
-            raise ValueError("Unsupported model type: {}, use 'VGG16' or 'VGG19' only.".format(type))
-        
+    def build(self):
         print("The model in use is: {}".format(self.model_type))
-
         self.y_true = tf.one_hot(self.y_true_cls, depth=self.num_classes, axis=1, name='y_true')
         self.l2_loss = 0
         self.layers_collection = []
@@ -346,26 +345,3 @@ class VGG():
         for layer in self.layers_collection:
             print(layer)
         print('-'*32)
-
-    def train(self, sess, EPOCH, iter_number, train_numpy):
-        '''Train the network with mini-batch input images with shape 224, 224.'''
-        sess.run(tf.global_variables_initializer())
-        merged_summary = tf.summary.merge_all()
-        for epoch in range(EPOCH):
-            print("-"*32)
-            for step in range(iter_number):
-                image_batch, label_batch = next(train_numpy)
-                feed_dict_train = {self.x_image: image_batch, self.y_true_cls: label_batch}
-                feed_dict_test = {self.x_image: image_batch, self.y_true_cls: label_batch, self.dropout_rate: 0.0}
-                if step % 5 == 0:
-                    s = sess.run(merged_summary, feed_dict=feed_dict_train)
-                    self.writer.add_summary(s, step)
-                _ = sess.run(self.optimizer, feed_dict=feed_dict_train)
-                acc, cost = sess.run([self.accuracy, self.cost], feed_dict=feed_dict_test)
-                print("EPOCH: {}, step: {}, accuracy: {}, loss: {}".format(epoch+1, step, acc, cost))
-                print('-'*32)
-            print("-"*32)
-        return
-
-    def save_graph(self, sess):
-        self.writer.add_graph(sess.graph)

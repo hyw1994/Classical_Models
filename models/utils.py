@@ -2,6 +2,7 @@ import tensorflow as tf
 import pathlib
 import scipy.io as scio
 import random
+import os
 
 def new_weights(shape, name, use_xavier=False):
     # Create tf.Variable for filters.
@@ -225,3 +226,20 @@ def prepare_train_ds(train_ds, BATCH_SIZE, INPUT_SIZE, image_size=227):
     train_ds = train_ds.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
 
     return train_ds
+
+def save_params(sess, file_name, global_step, saver, save_dir='checkpoints/'):
+    '''Save the model parameters to the particular directory'''
+    # Check if save_dir exists, create the dir if not.
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    save_path = os.path.join(save_dir, file_name)
+
+    saver.save(sess, save_path=save_path, global_step=global_step)
+
+def load_params(sess, model_name, prog, saver, save_dir='checkpoints/'):
+    try:
+        f = open(save_dir + model_name + '/checkpoint', 'r').readline()
+    except FileNotFoundError as identifier:
+        raise ValueError("There is no checkpoint found!")
+    model_number = prog.search(f).group()
+    saver.restore(sess=sess, save_path=save_dir + model_name + '/' + model_number)

@@ -1,4 +1,3 @@
-import models.AlexNet
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import matplotlib.pyplot as plt
@@ -14,9 +13,12 @@ if device_name != '/device:GPU:0':
   # raise SystemError('GPU device not found')
 else: print('Found GPU at: {}'.format(device_name))
 
-# Step 1: Load dataset from 102 category flower dataset 
-with tf.Session(config=tf.ConfigProto(
-      allow_soft_placement=True, log_device_placement=False)) as sess:
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+config.allow_soft_placement = True
+config.log_device_placement = False
+
+with tf.Session(config=config) as sess:
     # Use cifar100, which has 100 categories with size 32*32
     # Preproceess the images and set the hyperparameters
     cifar100_train, cifar100_info = tfds.load(name="cifar100", split=tfds.Split.TRAIN, as_supervised=True, with_info=True)  
@@ -40,7 +42,7 @@ with tf.Session(config=tf.ConfigProto(
     # train_ds = utils.prepare_train_ds(train_ds, BATCH_SIZE, BUFFER_SIZE)
 
     train_numpy = tfds.as_numpy(train_ds)
-    alexnet = AlexNet(NUM_CLASSES)
+    alexnet = AlexNet(dataset_name='cifar100', num_classes=NUM_CLASSES)
     alexnet.build()
     alexnet.save_graph(sess)
     alexnet.train(sess, EPOCH, iter_number, train_numpy)

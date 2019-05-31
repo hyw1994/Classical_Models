@@ -3,6 +3,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 from . import utils
+from .model import model
 
 # The network contains five CONV layer and three FC layer. The detailed layer information of the modele is: 
 # [227*227*3] INPUT LAYER: reshape the image and divide the image by 255.0 to rescale the distribution to [0, 1]. 
@@ -20,14 +21,14 @@ from . import utils
 # [4096] FC7: 4096 neurons
 # [1000] FC8: 1000 neurons, change it to the categories size while using.
 
-class AlexNet:
-    def __init__(self, num_classes):
-        super().__init__()
+class AlexNet(model):
+    def __init__(self, dataset_name, num_classes):
+        super().__init__(model_name='AlexNet', dataset_name=dataset_name)
         # Step 1: Define the network
         # Input image.
         self.num_classes = num_classes
         self.x_image = tf.placeholder(tf.float32, shape=[None, 227, 227, 3])
-        self.y_true = tf.placeholder(tf.int64, shape=[None])
+        self.y_true_cls = tf.placeholder(tf.int64, shape=[None])
 
         # Convolutional Layer 1.
         self.conv1_params = {
@@ -93,10 +94,9 @@ class AlexNet:
         self.fc6_size = 4096             
         self.fc7_size = 4096
         self.fc8_size = self.num_classes
-        self.writer = tf.summary.FileWriter('models/computational_graph/AlexNet')
 
     def build(self):
-        self.y_train_true = tf.one_hot(self.y_true, depth=self.num_classes, axis=1)
+        self.y_true = tf.one_hot(self.y_true_cls, depth=self.num_classes, axis=1)
         # Conv1: 96 11*11 filters, stride 4, relu 0, local response normalization, max pooing with z=3, s=2.
         self.conv1_layer, self.weight1 = utils.new_conv_layer(input=self.x_image,
                                                               num_input_channels=3,
@@ -173,11 +173,9 @@ class AlexNet:
         
         with tf.name_scope('loss'):
             # loss function
-            self.y_train_pred = tf.nn.softmax(self.fc8_layer)
-            self.y_train_pred_cls = tf.argmax(self.y_train_pred, axis=1)
-            self.y_train_cls = tf.argmax(self.y_train_true, axis=1)
-
-            self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.fc8_layer, labels=self.y_train_true)
+            self.y_pred = tf.nn.softmax(self.fc8_layer)
+            self.y_pred_cls = tf.argmax(self.y_train_pred, axis=1)
+            self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.fc8_layer, labels=self.y_true)
             self.cost = tf.reduce_mean(self.cross_entropy)
             
             tf.summary.scalar('cross_entropy_loss', self.cost)
@@ -188,7 +186,7 @@ class AlexNet:
 
         with tf.name_scope('accuracy'):
             # Performance Measured
-            self.correct_prediction = tf.equal(self.y_train_cls, self.y_train_pred_cls)
+            self.correct_prediction = tf.equal(self.y_true_cls, self.y_pred_cls)
             self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
             tf.summary.scalar('accuracy', self.accuracy)
 
@@ -205,24 +203,3 @@ class AlexNet:
         print(self.fc7_layer)
         print(self.fc8_layer)
         print('-' * 32)
-
-    def train(self, sess, EPOCH, iter_number, train_numpy):
-        sess.run(tf.global_variables_initializer())
-        merged_summary = tf.summary.merge_all()
-        for epoch in range(EPOCH):
-            print("-"*32)
-            for step in range(iter_number):
-                image_batch, label_batch = next(train_numpy)
-                feed_dict_train = {self.x_image: image_batch, self.y_true: label_batch}
-                feed_dict_test = {self.x_image: image_batch, self.y_true: label_batch, self.dropout_rate: 0.0}
-                if step % 5 == 0:
-                    s = sess.run(merged_summary, feed_dict=feed_dict_train)
-                    self.writer.add_summary(s, step)
-                _ = sess.run(self.optimizer, feed_dict=feed_dict_train)
-                acc, cost = sess.run([self.accuracy, self.cost], feed_dict=feed_dict_test)
-                print("EPOCH: {}, step: {}, accuracy: {}, loss: {}".format(epoch+1, step, acc, cost))
-                print('-'*32)
-            print("-"*32)
-    
-    def save_graph(self, sess):
-        self.writer.add_graph(sess.graph)
