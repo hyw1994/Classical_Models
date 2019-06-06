@@ -1,3 +1,4 @@
 checkpoints/AlexNet/* filter=lfs diff=lfs merge=lfs -text
+checkpoints/VGG/* filter=lfs diff=lfs merge=lfs -text
 models/computational_graph/AlexNet/cifar100/* filter=lfs diff=lfs merge=lfs -text
 models/computational_graph/VGG/cifar100/* filter=lfs diff=lfs merge=lfs -text
