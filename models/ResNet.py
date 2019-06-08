@@ -289,11 +289,10 @@ class ResNet50():
         g_list = tf.global_variables()
         bn_moving_variable = [g for g in g_list if "moving_mean" in g.name]
         bn_moving_variable += [g for g in g_list if "moving_variance" in g.name]
-        var_list += g_list
+        var_list += bn_moving_variable
         self.saver = tf.train.Saver(var_list, max_to_keep=5)
         self.merged_summary = tf.summary.merge_all()
         self.train_op = tf.group(self.optimizer, tf.get_collection(tf.GraphKeys.UPDATE_OPS))
-
 
     def train_res(self, sess, EPOCH, iter_number, train_numpy, evaluation_numpy=None):
         sess.run(tf.global_variables_initializer())
