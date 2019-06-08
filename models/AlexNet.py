@@ -174,7 +174,7 @@ class AlexNet(model):
         with tf.name_scope('loss'):
             # loss function
             self.y_pred = tf.nn.softmax(self.fc8_layer)
-            self.y_pred_cls = tf.argmax(self.y_train_pred, axis=1)
+            self.y_pred_cls = tf.argmax(self.y_pred, axis=1)
             self.cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.fc8_layer, labels=self.y_true)
             self.cost = tf.reduce_mean(self.cross_entropy)
             

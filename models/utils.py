@@ -4,16 +4,22 @@ import scipy.io as scio
 import random
 import os
 
-def new_weights(shape, name, use_xavier=False):
+def new_weights(shape, name, use_xavier=False, use_MSRA=False):
     # Create tf.Variable for filters.
     if(use_xavier):
         return tf.Variable(tf.glorot_uniform_initializer()(shape), name=name+'-W')
+        # return tf.get_variable(name=name+'-W', shape=shape, initializer=tf.glorot_uniform_initializer())
+    elif(use_MSRA):
+        return tf.Variable(tf.contrib.layers.variance_scaling_initializer()(shape), name=name+'-W')
+        # return tf.get_variable(name=name+'-W', shape=shape, initializer=tf.contrib.layers.variance_scaling_initializer())
     else:
-        return tf.Variable(tf.random.truncated_normal(shape, stddev=0.01), name=name+'-W')
+        return tf.Variable(tf.truncated_normal_initializer(mean=0, stddev=0.01)(shape), name=name+'-W')
+        # return tf.get_variable(name=name+'-W', shape=shape, initializer=tf.truncated_normal_initializer(mean=0, stddev=0.01))
 
 def new_biases(length, value, name):
     # Create tf.Variable for bias.
-    return tf.Variable(tf.constant(value, shape=[length]), name=name+'-b')
+    return tf.Variable(tf.initializers.constant(value=value)([length]), name=name+'-b')
+    # return tf.get_variable(name=name+'-b', shape=length, initializer=tf.initializers.constant(value=value))
 
 def new_conv_layer(input,              # The previous layer.
                    num_input_channels, # Num. channels in prev. layer.
@@ -28,9 +34,12 @@ def new_conv_layer(input,              # The previous layer.
                    pool_size = 3,
                    pool_stride = 2,
                    name='conv',
+                   padding_mode='VALID',
                    layers_collection = [],
                    weights_collection = [],
-                   use_xavier=False): 
+                   use_xavier=False,
+                   use_relu=True,
+                   use_MSRA=False): 
 
     # Shape of the filter-weights for the convolution.
     # This format is determined by the TensorFlow API.
@@ -47,13 +56,13 @@ def new_conv_layer(input,              # The previous layer.
                             mode='CONSTANT', name=name + '-padding')
 
         # Create new weights aka. filters with the given shape.
-        weights = new_weights(shape=filter_shape, name=name, use_xavier=use_xavier)
+        weights = new_weights(shape=filter_shape, name=name, use_xavier=use_xavier, use_MSRA=use_MSRA)
             
         # Do the convolotion job with different parameters settings.
         layer = tf.nn.conv2d(input=layer,
                             filter=weights,
                             strides=[1, stride, stride, 1],
-                            padding='VALID', name=name + '-conv')
+                            padding=padding_mode, name=name + '-conv')
 
         # Add the biases to the results of the convolution.
         # A bias-value is added to each filter-channel.
@@ -62,7 +71,8 @@ def new_conv_layer(input,              # The previous layer.
             layer = tf.add(layer, biases)
 
         # ReLU activation is use.
-        layer = tf.nn.relu(layer, name=name + '-relu')
+        if(use_relu):
+            layer = tf.nn.relu(layer, name=name + '-relu')
 
         # Local_response_normalization is used.
         if(use_norm):
@@ -98,13 +108,15 @@ def new_fc_layer(input,
                  use_dropout=True, 
                  dropout_rate=tf.placeholder_with_default(0.5, shape=()),
                  name='fc',
+                 bias_value = 1.0,
                  layers_collection=[],
                  weights_collection=[],
-                 use_xavier=False):
+                 use_xavier=False,
+                 use_MSRA=False):
     with tf.name_scope(name):
         # Create new weights and biases.
-        weights = new_weights(shape=[num_inputs, num_outputs], name=name, use_xavier=use_xavier)
-        biases = new_biases(length=num_outputs, value=1.0, name=name)
+        weights = new_weights(shape=[num_inputs, num_outputs], name=name, use_xavier=use_xavier, use_MSRA=use_MSRA)
+        biases = new_biases(length=num_outputs, value=bias_value, name=name)
         # Do the matrix multiple and get the output neurons.
         layer = tf.add(tf.matmul(input, weights), biases, name=name + '-add')
         # Add the ReLU activation here.
@@ -243,3 +255,198 @@ def load_params(sess, model_name, prog, saver, save_dir='checkpoints/'):
         raise ValueError("There is no checkpoint found!")
     model_number = prog.search(f).group()
     saver.restore(sess=sess, save_path=save_dir + model_name + '/' + model_number)
+
+def batch_normalization(input_tensor, name, train_status, ema):
+    '''Do the batch normalization job and keep the moving average mean and variance'''
+    x_shape = input_tensor.get_shape()
+    params_shape = x_shape[-1:]
+
+    axis = list(range(len(x_shape) - 1))
+
+    beta = tf.Variable(tf.zeros_initializer()(params_shape), name=name+'beta')
+    gamma = tf.Variable(tf.ones_initializer()(params_shape), name=name+'gamma')
+
+    # beta = tf.get_variable(name=name+'beta', 
+    #                      shape=params_shape,
+    #                      initializer=tf.zeros_initializer)
+    # gamma = tf.get_variable(name=name+'gamma',
+    #                       shape=params_shape,
+    #                       initializer=tf.ones_initializer)
+
+    mean, variance = tf.nn.moments(input_tensor, axis, name=name+'moving_average')
+    update_moving_mean = ema.apply([mean])
+    update_moving_variance = ema.apply([variance])
+
+    tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, update_moving_mean)
+    tf.add_to_collection(tf.GraphKeys.UPDATE_OPS, update_moving_variance)
+
+    mean, variance = tf.cond(train_status, lambda: (mean, variance), lambda: (ema.average(mean), ema.average(variance)))
+    tf.add_to_collection(tf.GraphKeys.BIASES, mean)
+    tf.add_to_collection(tf.GraphKeys.BIASES, variance)
+    x = tf.nn.batch_normalization(input_tensor, mean, variance, beta, gamma, 0.000001, name=name)
+
+    return x
+
+def new_conv_block(input_tensor, input_channel, kernel_size, filters, stage, block, layers_collection, weights_collection, ema, train_status, stride=2):
+    '''This function generates a conv layer group for ResNet with conv layer shortcut
+    
+    # Arguments
+        input_tensor: input tensor
+        kernel_size: default 3, the kernel size of
+            middle conv layer at main path
+        filters: list of integers, the filters of 3 conv layer at main path
+        stage: integer, current stage label, used for generating layer names
+        block: 'a','b'..., current block label, used for generating layer names
+        strides: Strides for the first conv layer in the block.
+
+        # Returns
+            Output tensor for the block
+    Note that from stage 3,
+    the first conv layer at main path is with strides=(2, 2)
+    And the shortcut should have strides=(2, 2) as well
+    '''
+    filters1, filters2, filters3 = filters
+    conv_name_base = 'res_' + str(stage) + block + '_branch'
+    bn_name_base = 'bn_' + str(stage) + block + '_branch'
+    
+    # First conv layer
+    x, _ = new_conv_layer(input=input_tensor, 
+                       num_input_channels=input_channel, 
+                       filter_size=1, 
+                       stride=stride,
+                       num_filters=filters1,
+                       use_MSRA=True,
+                       layers_collection=layers_collection,
+                       weights_collection=weights_collection,
+                       name=conv_name_base+'_a',
+                       use_relu=False,
+                       )
+    # x = batch_normalization(x, name=bn_name_base+'_a', train_status=train_status, ema=ema)
+    x = tf.layers.batch_normalization(inputs=x, training=train_status, name=bn_name_base+'_a')
+    x = tf.nn.relu(x)
+    
+    # Second conv layer
+    x, _ = new_conv_layer(input=x, 
+                       num_input_channels=filters1, 
+                       filter_size=kernel_size, 
+                       stride=1,
+                       num_filters=filters2,
+                       use_MSRA=True,
+                       layers_collection=layers_collection,
+                       weights_collection=weights_collection,
+                       name=conv_name_base+'_b',
+                       use_relu=False,
+                       padding_mode='SAME'
+                       ) 
+    # x = batch_normalization(x, name=bn_name_base+'_b', train_status=train_status, ema=ema)
+    x = tf.layers.batch_normalization(inputs=x, training=train_status, name=bn_name_base+'_b')
+    x = tf.nn.relu(x)
+
+    # Third conv layer
+    x, _ = new_conv_layer(input=x, 
+                       num_input_channels=filters2, 
+                       filter_size=1, 
+                       stride=1,
+                       num_filters=filters3,
+                       use_MSRA=True,
+                       layers_collection=layers_collection,
+                       weights_collection=weights_collection,
+                       name=conv_name_base+'_c',
+                       use_relu=False
+                       ) 
+    # x = batch_normalization(x, name=bn_name_base+'_c', train_status=train_status, ema=ema)
+    x = tf.layers.batch_normalization(inputs=x, training=train_status, name=bn_name_base+'_c')
+
+    # Short connect
+    shortcut, _ = new_conv_layer(input=input_tensor, 
+                            num_input_channels=input_channel, 
+                            filter_size=1, 
+                            stride=stride,
+                            num_filters=filters3,
+                            use_MSRA=True,
+                            layers_collection=layers_collection,
+                            weights_collection=weights_collection,
+                            name=conv_name_base+'shortcut',
+                            use_relu=False,
+                            ) 
+    # shortcut = batch_normalization(shortcut, name=bn_name_base+'shortcut', train_status=train_status, ema=ema)
+    shortcut = tf.layers.batch_normalization(inputs=shortcut, training=train_status, name=bn_name_base+'_shortcut')
+    x = tf.add(x, shortcut)
+    x = tf.nn.relu(x, name=conv_name_base+'_output')
+    layers_collection.append(x)
+    return x
+
+def new_identity_block(input_tensor, input_channel, kernel_size, filters, stage, block, layers_collection, weights_collection, ema, train_status):
+    '''This function generates an identity layer group for ResNet with conv layer shortcut
+    
+    # Arguments
+        input_tensor: input tensor
+        kernel_size: default 3, the kernel size of
+            middle conv layer at main path
+        filters: list of integers, the filters of 3 conv layer at main path
+        stage: integer, current stage label, used for generating layer names
+        block: 'a','b'..., current block label, used for generating layer names
+        strides: Strides for the first conv layer in the block.
+
+        # Returns
+            Output tensor for the block
+    Note that from stage 3,
+    the first conv layer at main path is with strides=(2, 2)
+    And the shortcut should have strides=(2, 2) as well
+    '''
+    filters1, filters2, filters3 = filters
+    conv_name_base = 'res_' + str(stage) + block + '_branch'
+    bn_name_base = 'bn_' + str(stage) + block + '_branch'
+    
+    # First conv layer
+    x, _ = new_conv_layer(input=input_tensor, 
+                       num_input_channels=input_channel, 
+                       filter_size=1, 
+                       stride=1,
+                       num_filters=filters1,
+                       use_MSRA=True,
+                       layers_collection=layers_collection,
+                       weights_collection=weights_collection,
+                       name=conv_name_base+'_a',
+                       use_relu=False,
+                       )
+    # x = batch_normalization(x, name=bn_name_base+'_a', train_status=train_status, ema=ema)
+    x = tf.layers.batch_normalization(inputs=x, training=train_status, name=bn_name_base+'_a')
+    x = tf.nn.relu(x)
+    
+    # Second conv layer
+    x, _ = new_conv_layer(input=x, 
+                       num_input_channels=filters1, 
+                       filter_size=kernel_size, 
+                       stride=1,
+                       num_filters=filters2,
+                       use_MSRA=True,
+                       layers_collection=layers_collection,
+                       weights_collection=weights_collection,
+                       name=conv_name_base+'_b',
+                       use_relu=False,
+                       padding_mode='SAME'
+                       ) 
+    # x = batch_normalization(x, name=bn_name_base+'_b', train_status=train_status, ema=ema)
+    x = tf.layers.batch_normalization(inputs=x, training=train_status, name=bn_name_base+'_b')
+    x = tf.nn.relu(x)
+
+    # Third conv layer
+    x, _ = new_conv_layer(input=x, 
+                       num_input_channels=filters2, 
+                       filter_size=1, 
+                       stride=1,
+                       num_filters=filters3,
+                       use_MSRA=True,
+                       layers_collection=layers_collection,
+                       weights_collection=weights_collection,
+                       name=conv_name_base+'_c',
+                       use_relu=False
+                       ) 
+    # x = batch_normalization(x, name=bn_name_base+'_c', train_status=train_status, ema=ema)
+    x = tf.layers.batch_normalization(inputs=x, training=train_status, name=bn_name_base+'_c')
+
+    x = tf.add(x, input_tensor)
+    x = tf.nn.relu(x, name=conv_name_base+'_output')
+    layers_collection.append(x)
+    return x
