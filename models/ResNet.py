@@ -283,13 +283,20 @@ class ResNet50():
         for layer in self.layers_collection:
             print(layer)
         print('-'*32)
-    
-    def train_res(self, sess, EPOCH, iter_number, train_numpy, evaluation_numpy=None):
-        self.saver = tf.train.Saver(max_to_keep=5)
-        sess.run(tf.global_variables_initializer())
-        merged_summary = tf.summary.merge_all()
-        train_op = tf.group(self.optimizer, tf.get_collection(tf.GraphKeys.UPDATE_OPS))
 
+        # Find all variables that is needed to save.
+        var_list = tf.trainable_variables()
+        g_list = tf.global_variables()
+        bn_moving_variable = [g for g in g_list if "moving_mean" in g.name]
+        bn_moving_variable += [g for g in g_list if "moving_variance" in g.name]
+        var_list += g_list
+        self.saver = tf.train.Saver(var_list, max_to_keep=5)
+        self.merged_summary = tf.summary.merge_all()
+        self.train_op = tf.group(self.optimizer, tf.get_collection(tf.GraphKeys.UPDATE_OPS))
+
+
+    def train_res(self, sess, EPOCH, iter_number, train_numpy, evaluation_numpy=None):
+        sess.run(tf.global_variables_initializer())
         try:
             self.recover_params(sess)
             print("Lastest saved model loaded successfully!")
@@ -305,9 +312,9 @@ class ResNet50():
                 feed_dict_train = {self.x_image: image_batch, self.y_true_cls: label_batch, self.train_status: 1}
                 feed_dict_test = {self.x_image: image_batch, self.y_true_cls: label_batch, self.train_status: 0}
                 if step % 5 == 0:
-                    s = sess.run(merged_summary, feed_dict=feed_dict_train)
+                    s = sess.run(self.merged_summary, feed_dict=feed_dict_train)
                     self.writer.add_summary(s, step)
-                _ = sess.run(train_op, feed_dict=feed_dict_train)
+                _ = sess.run(self.train_op, feed_dict=feed_dict_train)
                 train_accuracy, train_cost = sess.run([self.accuracy, self.cost], feed_dict=feed_dict_train)
                 print("EPOCH: {}, step: {}, train_batch_accuracy: {}, train_batch_loss: {}".format(epoch+1, step+1, train_accuracy, train_cost))
                 if (step % 100 == 0) or (epoch+1 == EPOCH) and (step+1 == iter_number) :

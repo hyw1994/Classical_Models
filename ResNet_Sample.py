@@ -26,7 +26,7 @@ with tf.Session(config=config) as sess:
     # Use cifar100, which has 100 categories with size 32*32
     # Preproceess the images and set the hyperparameters
     cifar100_train, cifar100_info = tfds.load(name="cifar100", split=tfds.Split.TRAIN, as_supervised=True, with_info=True)
-    BATCH_SIZE = 2
+    BATCH_SIZE = 128
     EPOCH = 7
     INPUT_SIZE=cifar100_info.splits["train"].num_examples
     BUFFER_SIZE = 8000
@@ -48,5 +48,5 @@ with tf.Session(config=config) as sess:
     train_numpy = tfds.as_numpy(train_ds)
     resnet50 = ResNet50(model_name='ResNet50', dataset_name='cifar100', num_classes=NUM_CLASSES)
     resnet50.build()
-    resnet50.save_graph(sess)
-    # resnet50.train_res(sess, EPOCH, iter_number, train_numpy)
+    # resnet50.save_graph(sess)
+    resnet50.train_res(sess, EPOCH, iter_number, train_numpy)
