@@ -285,9 +285,10 @@ class ResNet50():
         print('-'*32)
     
     def train_res(self, sess, EPOCH, iter_number, train_numpy, evaluation_numpy=None):
-        self.saver = tf.train.Saver(var_list=self.ema.variables_to_restore(), max_to_keep=5)
+        self.saver = tf.train.Saver(max_to_keep=5)
         sess.run(tf.global_variables_initializer())
         merged_summary = tf.summary.merge_all()
+        train_op = tf.group(self.optimizer, tf.get_collection(tf.GraphKeys.UPDATE_OPS))
 
         try:
             self.recover_params(sess)
@@ -299,13 +300,13 @@ class ResNet50():
         for epoch in range(EPOCH):
             print("-"*32)
             for step in range(iter_number):
+                sess.graph.finalize()
                 image_batch, label_batch = next(train_numpy)
                 feed_dict_train = {self.x_image: image_batch, self.y_true_cls: label_batch, self.train_status: 1}
                 feed_dict_test = {self.x_image: image_batch, self.y_true_cls: label_batch, self.train_status: 0}
                 if step % 5 == 0:
                     s = sess.run(merged_summary, feed_dict=feed_dict_train)
                     self.writer.add_summary(s, step)
-                train_op = tf.group(self.optimizer, tf.get_collection(tf.GraphKeys.UPDATE_OPS))
                 _ = sess.run(train_op, feed_dict=feed_dict_train)
                 train_accuracy, train_cost = sess.run([self.accuracy, self.cost], feed_dict=feed_dict_train)
                 print("EPOCH: {}, step: {}, train_batch_accuracy: {}, train_batch_loss: {}".format(epoch+1, step+1, train_accuracy, train_cost))

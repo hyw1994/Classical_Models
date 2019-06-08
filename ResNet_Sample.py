@@ -48,5 +48,5 @@ with tf.Session(config=config) as sess:
     train_numpy = tfds.as_numpy(train_ds)
     resnet50 = ResNet50(model_name='ResNet50', dataset_name='cifar100', num_classes=NUM_CLASSES)
     resnet50.build()
-    # resnet50.save_graph(sess)
-    resnet50.train_res(sess, EPOCH, iter_number, train_numpy)
+    resnet50.save_graph(sess)
+    # resnet50.train_res(sess, EPOCH, iter_number, train_numpy)
