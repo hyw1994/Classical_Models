@@ -30,7 +30,8 @@ class DenseNet121():
         input = layers.Input(shape=(224, 224, 3), name='Input')
 
         # Conv and max pool the input layer
-        input_conv = self.new_dense_layer(input_tensor=input, kernel_size=7, stride=2, name='Input', k=2)
+        # input_conv = self.new_dense_layer(input_tensor=input, kernel_size=7, stride=2, name='Input', k=2)
+        input_conv = layers.Conv2D(2*self.training_info.get('growth_rate'), kernel_size=7, strides=2, padding='SAME', kernel_initializer=tf.keras.initializers.he_uniform(), kernel_regularizer=tf.keras.regularizers.l2(1e-4), use_bias=False, name='Input-conv')(input)
         input_pool = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding='SAME', name='Input-max_pool')(input_conv)
 
         # Build dense block 1 and transition layer 1.
@@ -47,21 +48,22 @@ class DenseNet121():
 
         # Build dense block 4 and transition layer 4.
         dense_block4 = self.new_dense_block(input_tensor=transition_layer3, filters=16, name='dense_block4_')
+        dense_block4 = layers.BatchNormalization(beta_regularizer=tf.keras.regularizers.l2(1e-4), gamma_regularizer=tf.keras.regularizers.l2(1e-4), name='dense_block4_bn')(dense_block4)
+        dense_block4 = layers.ReLU(name='dense_block4_relu')(dense_block4)
 
         # Classification layer.
         global_pool = layers.GlobalAveragePooling2D(name='global_average_pool')(dense_block4)
-        flatten_layeer = layers.Flatten(name='flatten_layer')(global_pool)
-        dense_layer = layers.Dense(units=self.num_classes, activation='softmax')(flatten_layeer)
+        dense_layer = layers.Dense(units=self.num_classes, activation='softmax')(global_pool)
         
         # Build the keras model.
         self.model = tf.keras.Model(inputs=input, outputs=dense_layer)
         self.model.compile(optimizer=tf.train.MomentumOptimizer(0.1, momentum=0.9, use_nesterov=True),
-                                loss='categorical_crossentropy',
-                                metrics=['accuracy'])
+                                loss='sparse_categorical_crossentropy',
+                                metrics=['sparse_categorical_accuracy'])
         self.model.summary()
 
     def train(self, EPOCH, iter_number, train_ds):
-        self.model.fit(train_ds, epochs=EPOCH, steps_per_epoch=iter_number)
+        self.model.fit(train_ds, steps_per_epoch=iter_number ,epochs=EPOCH)
 
     def save_graph(self, sess):
         '''Save the computational graph to tensorboard'''
@@ -89,12 +91,12 @@ class DenseNet121():
 
     def new_dense_block(self, input_tensor, filters, name):
         '''This method will create dense block with 1*1 and 3*3 dense conv layers'''
-        tensor_list = [input_tensor]
+        
         for i in range(filters):
-            x = self.new_dense_layer(input_tensor=tensor_list, kernel_size=1, k=4, name=name+'conv-1-'+str(i+1))
-            x = self.new_dense_layer(input_tensor=tensor_list, kernel_size=3, name=name+'conv-3-'+str(i+1))
-            tensor_list.append(x)
-        return x    
+            x = self.new_dense_layer(input_tensor=input_tensor, kernel_size=1, k=4, name=name+'conv-1-'+str(i+1))
+            merge_tensor = self.new_dense_layer(input_tensor=x, kernel_size=3, name=name+'conv-3-'+str(i+1))
+            input_tensor = layers.Concatenate()([input_tensor, merge_tensor])
+        return input_tensor
 
     def new_dense_layer(self, input_tensor, kernel_size, name, stride=1, k=1):
         '''This method build the composit function with three operation: 
@@ -102,14 +104,9 @@ class DenseNet121():
         ReLu,
         Conv2D.
         '''
-        if(isinstance(input_tensor, list)):
-            if(len(input_tensor) > 1):
-                input_tensor = layers.Concatenate()(input_tensor)
-            else: 
-                input_tensor = input_tensor[0]
-        x = layers.BatchNormalization(name=name+'-bn')(input_tensor)
+        x = layers.BatchNormalization(beta_regularizer=tf.keras.regularizers.l2(1e-4), gamma_regularizer=tf.keras.regularizers.l2(1e-4), name=name+'-bn')(input_tensor)
         x = layers.ReLU(name=name+'-relu')(x)
-        x = layers.Conv2D(filters=k*self.training_info.get('growth_rate'), kernel_size=kernel_size, strides=stride, padding='SAME', kernel_regularizer=tf.keras.regularizers.l2(1e-4), name=name+'-conv')(x)
+        x = layers.Conv2D(filters=k*self.training_info.get('growth_rate'),kernel_initializer=tf.keras.initializers.he_uniform(), kernel_size=kernel_size, strides=stride, padding='SAME', kernel_regularizer=tf.keras.regularizers.l2(1e-4), name=name+'-conv')(x)
         return x
     
     def new_transition_layer(self, input_tensor, name):
@@ -118,7 +115,9 @@ class DenseNet121():
         Conv2D,
         AveragePooling2D.
         '''
-        x = layers.BatchNormalization(name=name+'-bn')(input_tensor)
-        x = layers.Conv2D(filters=int(0.5*self.training_info.get('growth_rate')), kernel_size=1, padding='SAME', kernel_regularizer=tf.keras.regularizers.l2(1e-4), name=name+'-conv')(x)
+        filters = input_tensor.shape.as_list()[-1]
+        x = layers.BatchNormalization(beta_regularizer=tf.keras.regularizers.l2(1e-4), gamma_regularizer=tf.keras.regularizers.l2(1e-4), name=name+'-bn')(input_tensor)
+        x = layers.ReLU(name=name+'-relu')(x)
+        x = layers.Conv2D(filters=int(0.5*filters), kernel_size=1, padding='SAME', kernel_initializer=tf.keras.initializers.he_uniform(), kernel_regularizer=tf.keras.regularizers.l2(1e-4), name=name+'-conv')(x)
         x = layers.AveragePooling2D(pool_size=(2, 2),name=name+'-avg_pool')(x)
         return x

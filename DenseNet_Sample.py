@@ -3,9 +3,10 @@
 
 import tensorflow as tf
 import tensorflow_datasets as tfds
-import matplotlib.pyplot as plt
 from models.DenseNet import DenseNet121
 from models import utils
+# from keras.applications.densenet import DenseNet121
+# import keras
 
 # Deetect if GPU is ready to use.
 device_name = tf.test.gpu_device_name()
@@ -32,8 +33,17 @@ NUM_CLASSES = cifar100_info.features['label'].num_classes
 iter_number = (int)(INPUT_SIZE / BATCH_SIZE) + 1
 train_ds = utils.prepare_train_ds(cifar100_train, BATCH_SIZE, BUFFER_SIZE, image_size=224)
 
-# train_numpy = tfds.as_numpy(train_ds)
+train_numpy = tfds.as_numpy(train_ds)
 densenet121 = DenseNet121(model_name='ResNet50', dataset_name='cifar100', num_classes=NUM_CLASSES)
 densenet121.build()
-# # resnet50.save_graph(sess)
+# resnet50.save_graph(sess)
 densenet121.train(EPOCH, iter_number, train_ds)
+# base_model = DenseNet121(input_shape=(224, 224, 3),
+#                                      weights=None,
+#                                      include_top=False,
+#                                      pooling='avg')
+
+# predictions = keras.layers.Dense(NUM_CLASSES, activation='softmax')(base_model.output)
+# model = keras.Model(inputs=base_model.input, outputs=predictions)
+# model.summary()
+# model.fit(train_ds, epochs=EPOCH, steps_per_epoch=iter_number)
