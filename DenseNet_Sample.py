@@ -38,12 +38,3 @@ densenet121 = DenseNet121(model_name='ResNet50', dataset_name='cifar100', num_cl
 densenet121.build()
 # resnet50.save_graph(sess)
 densenet121.train(EPOCH, iter_number, train_ds)
-# base_model = DenseNet121(input_shape=(224, 224, 3),
-#                                      weights=None,
-#                                      include_top=False,
-#                                      pooling='avg')
-
-# predictions = keras.layers.Dense(NUM_CLASSES, activation='softmax')(base_model.output)
-# model = keras.Model(inputs=base_model.input, outputs=predictions)
-# model.summary()
-# model.fit(train_ds, epochs=EPOCH, steps_per_epoch=iter_number)

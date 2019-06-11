@@ -32,7 +32,9 @@ class DenseNet121():
         # Conv and max pool the input layer
         # input_conv = self.new_dense_layer(input_tensor=input, kernel_size=7, stride=2, name='Input', k=2)
         input_conv = layers.Conv2D(2*self.training_info.get('growth_rate'), kernel_size=7, strides=2, padding='SAME', kernel_initializer=tf.keras.initializers.he_uniform(), kernel_regularizer=tf.keras.regularizers.l2(1e-4), use_bias=False, name='Input-conv')(input)
-        input_pool = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding='SAME', name='Input-max_pool')(input_conv)
+        input_bn = layers.BatchNormalization(beta_regularizer=tf.keras.regularizers.l2(1e-4), gamma_regularizer=tf.keras.regularizers.l2(1e-4), name='Input-bn')(input_conv)
+        input_relu = layers.ReLU(name='Input-relu')(input_bn)
+        input_pool = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding='SAME', name='Input-max_pool')(input_relu)
 
         # Build dense block 1 and transition layer 1.
         dense_block1 = self.new_dense_block(input_tensor=input_pool, filters=6, name='dense_block1_')
@@ -57,13 +59,16 @@ class DenseNet121():
         
         # Build the keras model.
         self.model = tf.keras.Model(inputs=input, outputs=dense_layer)
-        self.model.compile(optimizer=tf.train.MomentumOptimizer(0.1, momentum=0.9, use_nesterov=True),
+        self.model.compile(optimizer=tf.keras.optimizers.SGD(0.1, momentum=0.9, nesterov=True),
                                 loss='sparse_categorical_crossentropy',
-                                metrics=['sparse_categorical_accuracy'])
+                                metrics=['sparse_categorical_accuracy'],
+                                )
         self.model.summary()
 
     def train(self, EPOCH, iter_number, train_ds):
-        self.model.fit(train_ds, steps_per_epoch=iter_number ,epochs=EPOCH)
+        reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.1,
+                                        patience=10, min_lr=0.0001)
+        self.model.fit(train_ds, steps_per_epoch=iter_number ,epochs=EPOCH, callbacks=[reduce_lr])
 
     def save_graph(self, sess):
         '''Save the computational graph to tensorboard'''
