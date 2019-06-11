@@ -34,7 +34,7 @@ iter_number = (int)(INPUT_SIZE / BATCH_SIZE) + 1
 train_ds = utils.prepare_train_ds(cifar100_train, BATCH_SIZE, BUFFER_SIZE, image_size=224)
 
 train_numpy = tfds.as_numpy(train_ds)
-densenet121 = DenseNet121(model_name='ResNet50', dataset_name='cifar100', num_classes=NUM_CLASSES)
+densenet121 = DenseNet121(model_name='DenseNet121', dataset_name='cifar100', num_classes=NUM_CLASSES)
 densenet121.build()
 # resnet50.save_graph(sess)
 densenet121.train(EPOCH, iter_number, train_ds)
