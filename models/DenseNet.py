@@ -62,10 +62,10 @@ class DenseNet121():
                                 )
         self.model.summary()
 
-    def train(self, EPOCH, train_ds):
+    def train(self, EPOCH, train_ds, iter_number):
         reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.1,
                                                          patience=5, min_lr=0.0001, min_delta=0.01, verbose=1)
-        self.model.fit(train_ds, epochs=EPOCH, callbacks=[reduce_lr])
+        self.model.fit(train_ds, steps_per_epoch=iter_number, epochs=EPOCH, callbacks=[reduce_lr])
 
     def save_graph(self, sess):
         '''Save the computational graph to tensorboard'''

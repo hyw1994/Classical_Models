@@ -28,6 +28,7 @@ cifar100_train, cifar100_info = tfds.load(name="cifar100", split=tfds.Split.TRAI
 BATCH_SIZE = 128
 EPOCH = 7
 INPUT_SIZE=cifar100_info.splits["train"].num_examples
+iter_number = (int)(INPUT_SIZE / BATCH_SIZE) + 1
 BUFFER_SIZE = 8000
 NUM_CLASSES = cifar100_info.features['label'].num_classes
 train_ds = utils.prepare_train_ds(cifar100_train, BATCH_SIZE, BUFFER_SIZE, image_size=224)
@@ -36,4 +37,4 @@ train_numpy = tfds.as_numpy(train_ds)
 densenet121 = DenseNet121(model_name='DenseNet121', dataset_name='cifar100', num_classes=NUM_CLASSES)
 densenet121.build()
 # resnet50.save_graph(sess)
-densenet121.train(EPOCH, train_ds)
+densenet121.train(EPOCH, train_ds, iter_number=iter_number)
