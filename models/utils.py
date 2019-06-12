@@ -1,5 +1,6 @@
 import tensorflow as tf
 import pathlib
+import numpy as np
 import scipy.io as scio
 import random
 import os
@@ -450,3 +451,17 @@ def new_identity_block(input_tensor, input_channel, kernel_size, filters, stage,
     x = tf.nn.relu(x, name=conv_name_base+'_output')
     layers_collection.append(x)
     return x
+
+def pad_sequences(train_sequences, test_sequences):
+    input_sequence = train_sequences + test_sequences
+    num_tokens = [len(tokens) for tokens in input_sequence]
+    num_tokens = np.array(num_tokens)
+    mean_tokens = np.mean(num_tokens)
+    max_tokens = int(mean_tokens + 2 * np.std(num_tokens))
+
+    x_train_pad = tf.keras.preprocessing.sequence.pad_sequences(train_sequences, maxlen=max_tokens)
+    x_test_pad = tf.keras.preprocessing.sequence.pad_sequences(test_sequences, maxlen=max_tokens)
+
+
+    print("Maximum token number is: {}, {:.2f}% of the input data is maintained".format(max_tokens, np.sum((num_tokens < max_tokens) / len(num_tokens))))
+    return x_train_pad, x_test_pad, max_tokens
