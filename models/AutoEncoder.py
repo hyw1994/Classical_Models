@@ -24,7 +24,7 @@ class AutoEncoder():
         decoder = keras.layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')(decoder)
 
         self.autoencoder = keras.Model(input, decoder)
-        self.autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
+        self.autoencoder.compile(optimizer='adadelta', loss='mse')
         self.autoencoder.summary()
 
     def train(self, x_train, x_test):
