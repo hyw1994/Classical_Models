@@ -1,4 +1,5 @@
 import tensorflow as tf
+import keras
 import pathlib
 import numpy as np
 import scipy.io as scio
@@ -465,3 +466,20 @@ def pad_sequences(train_sequences, test_sequences):
 
     print("Maximum token number is: {}, {:.2f}% of the input data is maintained".format(max_tokens, np.sum((num_tokens < max_tokens) / len(num_tokens))))
     return x_train_pad, x_test_pad, max_tokens
+
+def sampling(args):
+    z_mean, z_log_var = args
+    batch = keras.backend.shape(z_mean)[0]
+    dim = keras.backend.int_shape(z_mean)[1]
+
+    epsilon = keras.backend.random_normal(shape=(batch, dim))
+    return z_mean + keras.backend.exp(0.5 * z_log_var) * epsilon
+
+def reconstruction_loss(y_true, y_pred, z_mean, z_log_var):
+    reconstruction_loss = keras.losses.mse(keras.backend.flatten(y_true), keras.backend.flatten(y_pred))
+    reconstruction_loss *= 28*28
+    kl_loss = 1 + z_log_var - keras.backend.square(z_mean) - keras.backend.exp(z_log_var)
+    kl_loss = keras.backend.sum(kl_loss, axis=-1)
+    kl_loss *= -0.5
+    vae_loss = keras.backend.mean(reconstruction_loss + kl_loss)
+    return vae_loss
