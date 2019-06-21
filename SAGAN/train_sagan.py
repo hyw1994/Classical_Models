@@ -3,8 +3,8 @@ import tensorflow_datasets as tfds
 import os
 from models.models import Generator
 from models.models import Discriminator
-from losses.sagan_loss import discriminator_loss, generator_loss
-from utils import utils
+from libs.sagan_loss import discriminator_loss, generator_loss
+import utils
 
 tf.enable_eager_execution()
 
@@ -73,6 +73,7 @@ if os.path.exists(basepath):
 
 else:
     print("Model folder not found.")
+
 # Dynamicly train the network
 fake_input_test = tf.random_normal(shape=(flags.FLAGS.number_of_test_images, flags.FLAGS.z_size), dtype=flags.FLAGS.dtype)
 
@@ -104,7 +105,6 @@ for epoch in range(EPOCH):
 
         # get all the discriminator variables
         generator_variables = generator_net.variables
-        generator_variables.append(generator_net.attention.gamma)
 
         generator_grads = g_tape.gradient(gen_loss, generator_variables)
 

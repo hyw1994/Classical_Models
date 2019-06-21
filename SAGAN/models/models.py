@@ -1,8 +1,8 @@
 import tensorflow as tf
 from tensorflow.python.keras import Model
-from layers.ResizeImage import ResizeImage
-from layers.convolutions import Conv2D, Dense, Conv2DTranspose
-from layers.self_attention import SelfAttention
+from libs.resize_image import ResizeImage
+from libs.convolutions import Conv2D, Dense, Conv2DTranspose
+from libs.self_attention import SelfAttention
 
 class Generator(tf.keras.Model):
     def __init__(self, dtype):
@@ -70,7 +70,7 @@ class Discriminator(tf.keras.Model):
     def __init__(self, alpha, dtype):
         super(Discriminator, self).__init__()
         self.alpha = alpha
-        # -------- Block 1
+        # -------- Block 1 -------- #
         self.conv1 = Conv2D(32, 4, spectral_normalization=True, dtype=dtype, strides=2, padding='SAME', activation=None)
         self.conv2 = Conv2D(64, 4, spectral_normalization=True, strides=2, dtype=dtype, padding='SAME', activation=None)
 

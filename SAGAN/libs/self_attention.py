@@ -1,5 +1,5 @@
 import tensorflow as tf
-from layers.convolutions import Conv2D
+from libs.convolutions import Conv2D
 
 def hw_flatten(x):
     # Input shape x: [BATCH, HEIGHT, WIDTH, CHANNELS]
