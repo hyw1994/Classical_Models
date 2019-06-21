@@ -22,7 +22,6 @@ from tensorflow.python.ops import gen_math_ops
 def _l2normalizer(v, epsilon=1e-12):
     return v / (K.sum(v ** 2) ** 0.5 + epsilon)
 
-
 def power_iteration(W, u, rounds=1):
     '''
     Accroding the paper, we only need to do power iteration one time.
@@ -332,7 +331,6 @@ class Conv2D(tf_convolutional_layers.Conv2D, Layer):
         }
         base_config = super(Conv2D, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
-
 
 @tf_export('keras.layers.Conv2DTranspose',
            'keras.layers.Convolution2DTranspose')
