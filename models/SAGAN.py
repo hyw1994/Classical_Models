@@ -1,8 +1,9 @@
-from keras.layers import *
-from keras.optimizers import Adam
-from keras import Model
-from layers.SpectralNormalization import DenseSN, ConvSN2D
+from tensorflow.python.keras.layers import Input, Reshape
+from tensorflow.python.keras.optimizers import Adam
+from tensorflow.python.keras import Model
+from layers.convolutions import Dense, Conv2D
 from layers.ResizeImage import ResizeImage
+import tensorflow as tf
 
 class SAGAN():
     def __init__(self, *args, **kwargs):
@@ -10,10 +11,11 @@ class SAGAN():
 
     def make_generator_model(self, noise_input, image_size):
         '''Generate the fake image using noise_input'''
-        x = DenseSN(7*7*256, use_bias=False, kernel_initializer='glorot_uniform')(noise_input)
+        x = Dense(7*7*256, use_bias=False, kernel_initializer='glorot_uniform', spectral_normalization=True)(noise_input)
         x = Reshape((7, 7, 256))(x)
         x = ResizeImage(image_size, image_size)(x)
-        x = ConvSN2D(3, (1, 1), strides=1, padding='SAME')(x)
+        x = Conv2D(3, (1, 1), strides=1, padding='SAME', spectral_normalization=True)(x)
+        
         model = Model(noise_input, x)
         return model
 
