@@ -7,7 +7,7 @@ from libs.sagan_loss import discriminator_loss, generator_loss
 import utils
 
 tf.enable_eager_execution()
-
+assert tf.__version__ == '1.13.1' or tf.__version__ == '1.14.0', "This code is only tested on Tensorflow 1.13.1 and 1.14.0"
 # Define model constants.
 flags = tf.app.flags
 flags = utils.create_flags(flags)
